@@ -1,0 +1,10 @@
+{
+  "key.nickpaints.open_gui": "Открыть настройки раскраски",
+  "category.nickpaints.main": "Раскраски ника",
+  "chat.nickpaints.sync.success": "Пейнт успешно синхронизирован с облаком!",
+  "chat.nickpaints.sync.failure": "Ошибка синхронизации: %s",
+  "chat.nickpaints.sync.auth_failed": "Ошибка аутентификации. Ваша сессия может быть недействительна. Попробуйте перезапустить игру.",
+  "chat.nickpaints.update.main": "Доступна новая версия NickPaints (%s)! Рекомендуется обновиться для корректной работы облачных пейнтов.",
+  "chat.nickpaints.update.link": "[Открыть на Modrinth]",
+  "chat.nickpaints.update.hover": "Нажмите, чтобы открыть страницу загрузки"
+}

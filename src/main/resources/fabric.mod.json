@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "nickpaints",
+  "version": "${version}",
+  "name": "NickPaints",
+  "description": "",
+  "authors": ["p4pingvin4ik"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/NickPaints/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "net.p4pingvin4ik.NickPaints.client.NickPaintsMod"
+    ]
+  },
+  "mixins": [
+    "NickPaints.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}

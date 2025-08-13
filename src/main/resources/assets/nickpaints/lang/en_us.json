@@ -1,0 +1,10 @@
+{
+  "key.nickpaints.open_gui": "Open Nick Paints Settings",
+  "category.nickpaints.main": "Nick Paints",
+  "chat.nickpaints.sync.success": "Paint successfully synced with the cloud!",
+  "chat.nickpaints.sync.failure": "Failed to sync paint: %s",
+  "chat.nickpaints.sync.auth_failed": "Authentication failed. Your session might be invalid. Try restarting your game.",
+  "chat.nickpaints.update.main": "A new version of NickPaints (%s) is available! An update is recommended for cloud paints to work correctly.",
+  "chat.nickpaints.update.link": "[Open on Modrinth]",
+  "chat.nickpaints.update.hover": "Click to open the download page"
+}
