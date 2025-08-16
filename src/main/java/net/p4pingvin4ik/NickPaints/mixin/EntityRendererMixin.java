@@ -3,7 +3,6 @@ package net.p4pingvin4ik.NickPaints.mixin;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.font.TextRenderer.TextLayerType;
-import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.entity.EntityRenderDispatcher;
 import net.minecraft.client.render.entity.EntityRenderer;
@@ -24,9 +23,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.awt.Color;
-
-@Mixin(EntityRenderer.class)
+@Mixin(value = EntityRenderer.class, priority = 990)
 public abstract class EntityRendererMixin<T extends Entity, S extends EntityRenderState> {
 
     @Shadow @Final private EntityRenderDispatcher dispatcher;
@@ -73,6 +70,10 @@ public abstract class EntityRendererMixin<T extends Entity, S extends EntityRend
         // A paint is available, so we cancel the original method and render it ourselves.
         ci.cancel();
 
+        /**
+        * Renders the nametag using a simplified, single-pass method that is compatible with shaders.
+        * We trust the shader pack to handle lighting, shadows, and emissive effects.
+        */
         boolean isNotSneaking = !state.sneaking;
         String name = text.getString();
         int yOffset = "deadmau5".equals(name) ? -10 : 0;
@@ -85,43 +86,18 @@ public abstract class EntityRendererMixin<T extends Entity, S extends EntityRend
         matrices.scale(0.025F, -0.025F, 0.025F);
         Matrix4f matrix4f = matrices.peek().getPositionMatrix();
 
-        // Pass 1: Render the background.
-        // This pass renders a translucent background behind the entire text object.
+        // Render background
         int backgroundColor = (int)(MinecraftClient.getInstance().options.getTextBackgroundOpacity(0.25F) * 255.0F) << 24;
-        textRenderer.draw(text, xOffset, (float) yOffset, 0x20FFFFFF, false, matrix4f, vertexConsumers, isNotSneaking ? TextLayerType.SEE_THROUGH : TextLayerType.NORMAL, backgroundColor, light);
+        textRenderer.draw(text, xOffset, (float) yOffset, 0, false, matrix4f, vertexConsumers, TextLayerType.SEE_THROUGH, backgroundColor, light);
 
-        // Pass 2: Render the main gradient text (or its shadow if not sneaking).
-        // This pass is darker to create a subtle drop-shadow effect, improving readability.
+        // Render the gradient text in a single pass
         float currentX = xOffset;
         for (int k = 0; k < name.length(); k++) {
             String characterStr = String.valueOf(name.charAt(k));
             int gradColor = GradientUtil.getColor(paintToShow, k, name.length());
-
-            // The text is rendered with its full color if sneaking, or a darkened version if not.
-            // This is a creative way to handle the "shadow" pass.
-            int pass2Color = gradColor;
-            if (isNotSneaking) {
-                Color c = new Color(gradColor);
-                pass2Color = new Color((int) (c.getRed() * 0.25F), (int) (c.getGreen() * 0.25F), (int) (c.getBlue() * 0.25F)).getRGB();
-            }
-
-            textRenderer.draw(characterStr, currentX, (float) yOffset, pass2Color, false, matrix4f, vertexConsumers, isNotSneaking ? TextLayerType.SEE_THROUGH : TextLayerType.NORMAL, 0, light);
+            // We render the text once with full color and no special light modifications.
+            textRenderer.draw(characterStr, currentX, (float) yOffset, gradColor, false, matrix4f, vertexConsumers, isNotSneaking ? TextLayerType.SEE_THROUGH : TextLayerType.NORMAL, 0, light);
             currentX += textRenderer.getWidth(characterStr);
-        }
-
-        // Pass 3: Render the bright foreground text (emissive layer).
-        // This pass only runs when not sneaking and renders the text at full brightness,
-        // making it "glow" and stand out, just like vanilla nametags.
-        if (isNotSneaking) {
-            currentX = xOffset;
-            int foregroundLight = LightmapTextureManager.applyEmission(light, 2);
-            for (int k = 0; k < name.length(); k++) {
-                String characterStr = String.valueOf(name.charAt(k));
-                int gradColor = GradientUtil.getColor(paintToShow, k, name.length());
-
-                textRenderer.draw(characterStr, currentX, (float) yOffset, gradColor, false, matrix4f, vertexConsumers, TextLayerType.NORMAL, 0, foregroundLight);
-                currentX += textRenderer.getWidth(characterStr);
-            }
         }
 
         matrices.pop();
