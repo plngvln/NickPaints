@@ -23,7 +23,7 @@ public class GradientOptionsScreen extends Screen {
         int fieldX = this.width / 2 - fieldWidth / 2;
 
         this.gradientField = new CompletionTextFieldWidget(this.textRenderer, fieldX, this.height / 2 - 10, fieldWidth, 20, Text.of(""));
-        this.gradientField.setMaxLength(128);
+        this.gradientField.setMaxLength(256);
         this.gradientField.setText(ConfigManager.CONFIG.currentGradient);
         this.addSelectableChild(this.gradientField);
 
