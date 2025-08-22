@@ -1,6 +1,6 @@
 {
   "key.nickpaints.open_gui": "Открыть настройки раскраски",
-  "category.nickpaints.main": "Раскраски ника",
+  "category.nickpaints.main": "Nick Paints",
   "chat.nickpaints.sync.success": "Пейнт успешно синхронизирован с облаком!",
   "chat.nickpaints.sync.failure": "Ошибка синхронизации: %s",
   "chat.nickpaints.sync.auth_failed": "Ошибка аутентификации. Ваша сессия может быть недействительна. Попробуйте перезапустить игру.",

@@ -7,7 +7,7 @@
   "authors": ["p4pingvin4ik"],
   "contact": {},
   "license": "MIT",
-  "icon": "assets/NickPaints/icon.png",
+  "icon": "assets/nickpaints/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": [
