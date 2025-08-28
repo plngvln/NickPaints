@@ -28,9 +28,8 @@ public class VersionChecker {
     private static final Logger LOGGER = NickPaintsMod.LOGGER;
     private static final HttpClient client = HttpClient.newHttpClient();
 
-    // Make sure to set this to your actual project slug on Modrinth before release.
-    private static final String MODRINTH_PROJECT_SLUG = "nickpaints";
 
+    private static final String MODRINTH_PROJECT_SLUG = "nickpaints";
     private static final String MODRINTH_API_URL = "https://api.modrinth.com/v2/project/" + MODRINTH_PROJECT_SLUG + "/version";
 
     // --- State variables for delayed notification ---
