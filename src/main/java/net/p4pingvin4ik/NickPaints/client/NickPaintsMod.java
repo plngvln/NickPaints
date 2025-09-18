@@ -1,12 +1,14 @@
 package net.p4pingvin4ik.NickPaints.client;
 
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.p4pingvin4ik.NickPaints.client.commands.NickPaintsCommands;
+import net.p4pingvin4ik.NickPaints.client.imgui.ImGuiImpl;
 import net.p4pingvin4ik.NickPaints.config.ConfigManager;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
@@ -19,18 +21,23 @@ public class NickPaintsMod implements ClientModInitializer {
 
     private static KeyBinding keyBinding;
 
+
     @Override
     public void onInitializeClient() {
-
-        LOGGER.info("Initializing NickPaints Mod...");
         ConfigManager.loadConfig();
-        VersionChecker.checkForUpdates();
         NickPaintsCommands.register();
-        keyBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.nickpaints.open_gui", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G, "category.nickpaints.main"));
+        VersionChecker.checkForUpdates();
+
+        ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
+            LOGGER.info("Minecraft client started, initializing ImGui context...");
+            ImGuiImpl.create(client.getWindow().getHandle());
+        });
+
+        keyBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.gradient_nickname.open_gui", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G, "category.gradient_nickname.main"));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            while (keyBinding.wasPressed()) {
-                client.setScreen(new GradientOptionsScreen(client.currentScreen));
+            if (keyBinding.wasPressed()) {
+                client.setScreen(new ImGuiScreen());
             }
             CloudSyncManager.processQueue();
         });

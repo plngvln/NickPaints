@@ -10,6 +10,8 @@
     "EntityRenderStateMixin"
   ],
   "client": [
+    "GameRendererMixin",
+    "MinecraftClientMixin"
   ],
   "injectors": {
     "defaultRequire": 1

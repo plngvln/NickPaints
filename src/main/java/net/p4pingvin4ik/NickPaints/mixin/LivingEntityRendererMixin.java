@@ -12,7 +12,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class LivingEntityRendererMixin {
 
     /**
-     * @reason To force the game to render the local player's own nametag in third-person view.
+     * @reason To force the game to draw the local player's own nametag in third-person view.
      * By default, Minecraft's rendering logic in hasLabel() hides the nametag for the player entity
      * that matches the client's player. This mixin intercepts that check.
      */

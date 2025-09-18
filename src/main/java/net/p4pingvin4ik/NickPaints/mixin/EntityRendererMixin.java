@@ -23,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
  * all vanilla rendering logic (including depth, layers, and shadows) and drastically improves
  * compatibility with other mods like Iris.
  */
-@Mixin(value = EntityRenderer.class,priority = 1010)
+@Mixin(value = EntityRenderer.class,priority = 990)
 public abstract class EntityRendererMixin<T extends Entity, S extends EntityRenderState> {
 
     /**
