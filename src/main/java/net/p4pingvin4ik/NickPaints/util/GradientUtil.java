@@ -140,11 +140,11 @@ public class GradientUtil {
     private static int getRainbowColor(String gradientString, int charIndex, int totalChars) {
         Matcher rainbowMatcher = RAINBOW_PATTERN.matcher(gradientString.toLowerCase().trim());
         if (!rainbowMatcher.matches()) return Color.WHITE.getRGB();
-        int speed = 3000;
+        long speed = 3000L;
         try {
-            speed = Integer.parseInt(rainbowMatcher.group(1));
+            long parsedSpeed = Long.parseLong(rainbowMatcher.group(1));
+            speed = Math.max(MIN_ANIMATION_SPEED, parsedSpeed);
         } catch (NumberFormatException ignored) {}
-        if (speed == 0) speed = 3000;
         float hue = (float) (System.currentTimeMillis() % speed) / speed - (float) charIndex / totalChars * 0.5f;
         return Color.HSBtoRGB(hue, 0.8f, 1.0f);
     }

@@ -8,6 +8,7 @@ import imgui.type.ImBoolean;
 import imgui.type.ImInt;
 import imgui.type.ImString;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.network.PlayerListEntry;
 import net.minecraft.text.Text;
@@ -111,7 +112,10 @@ public class ImGuiScreen extends Screen implements RenderInterface {
 
         ImGui.end(); // End the Dockspace Host window
     }
-
+    @Override
+    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+        // Do nothing.
+    }
     /**
      * Renders the main window for creating and editing gradients.
      */
@@ -125,7 +129,7 @@ public class ImGuiScreen extends Screen implements RenderInterface {
 
         if (isRainbowMode.get()) {
             ImGui.text(Lang.get("gui.nickpaints.option.speed"));
-            ImGui.sliderInt("##rainbowspeed", rainbowSpeed.getData(), 100, 20000);
+            ImGui.sliderInt("##rainbowspeed", rainbowSpeed.getData(), 1000, 20000);
         } else {
             renderColorEditor();
             renderOptions();
