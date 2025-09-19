@@ -3,7 +3,7 @@ package net.p4pingvin4ik.NickPaints.mixin;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.render.RenderTickCounter;
-import net.p4pingvin4ik.NickPaints.client.imgui.ImGuiImpl; // <-- ИЗМЕНИ ИМПОРТ
+import net.p4pingvin4ik.NickPaints.client.imgui.ImGuiImpl;
 import net.p4pingvin4ik.NickPaints.client.imgui.RenderInterface;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;

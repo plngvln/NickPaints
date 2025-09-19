@@ -15,6 +15,7 @@ import net.minecraft.text.Text;
 import net.p4pingvin4ik.NickPaints.client.imgui.RenderInterface;
 import net.p4pingvin4ik.NickPaints.config.ConfigManager;
 import net.p4pingvin4ik.NickPaints.util.GradientUtil;
+import org.lwjgl.glfw.GLFW;
 
 import java.awt.Color;
 import java.io.File;
@@ -402,5 +403,18 @@ public class ImGuiScreen extends Screen implements RenderInterface {
     @Override
     public boolean shouldPause() {
         return false;
+    }
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            ImGui.setWindowFocus(null);
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+    @Override
+    public void removed() {
+        long windowHandle = MinecraftClient.getInstance().getWindow().getHandle();
+        GLFW.glfwSetCursor(windowHandle, 0L);
+        super.removed();
     }
 }
