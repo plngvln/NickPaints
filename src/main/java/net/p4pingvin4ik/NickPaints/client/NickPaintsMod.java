@@ -29,7 +29,7 @@ public class NickPaintsMod implements ClientModInitializer {
         VersionChecker.checkForUpdates();
 
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
-            LOGGER.info("Minecraft client started, initializing ImGui context...");
+            LOGGER.info("initializing NickPaints...");
             ImGuiImpl.create(client.getWindow().getHandle());
         });
 
