@@ -7,6 +7,7 @@ import imgui.extension.implot.ImPlot;
 import imgui.flag.ImGuiConfigFlags;
 import imgui.gl3.ImGuiImplGl3;
 import imgui.glfw.ImGuiImplGlfw;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.Framebuffer;
 import net.minecraft.client.gl.GlBackend;
@@ -17,6 +18,7 @@ import org.lwjgl.opengl.GL30;
 
 
 import java.io.File;
+import java.nio.file.Path;
 
 /**
  * This class handles the low-level initialization and rendering loop for ImGui.
@@ -32,7 +34,10 @@ public class ImGuiImpl {
         ImPlot.createContext();
 
         final ImGuiIO data = ImGui.getIO();
-        data.setIniFilename("nickpaints.ini");
+        Path configPath = FabricLoader.getInstance().getConfigDir();
+        data.setIniFilename(configPath.resolve("nickpaints.ini").toString());
+
+        data.setConfigFlags(ImGuiConfigFlags.DockingEnable);
 
         try {
             final ImFontAtlas fontAtlas = data.getFonts();
@@ -52,42 +57,9 @@ public class ImGuiImpl {
         } catch (Exception e) {
             NickPaintsMod.LOGGER.error("Failed to load custom font for ImGui.", e);
         }
-        data.setConfigFlags(ImGuiConfigFlags.DockingEnable);
-        try {
-            final ImFontAtlas fontAtlas = data.getFonts();
-            final ImFontConfig fontConfig = new ImFontConfig();
-
-            // This is crucial: it tells ImGui to not clear the atlas, so we can add to the default font.
-            fontConfig.setMergeMode(true);
-            fontConfig.setPixelSnapH(true);
-
-            // Get the Cyrillic character range from ImGui's built-in ranges.
-            final short[] glyphRanges = fontAtlas.getGlyphRangesCyrillic();
-
-            // --- Path to a system font that supports Cyrillic ---
-            // Tahoma is a clean, widely available font on Windows.
-            // For cross-platform support, it's better to bundle a font with the mod.
-            File fontFile = new File("C:/Windows/Fonts/tahoma.ttf");
-            if (fontFile.exists()) {
-                // Add the default font first.
-                fontAtlas.addFontDefault();
-                // Then, merge our new font with Cyrillic characters into the default one.
-                fontAtlas.addFontFromFileTTF(fontFile.getAbsolutePath(), 16.0f, fontConfig, glyphRanges);
-                NickPaintsMod.LOGGER.info("Successfully loaded and merged system font for Cyrillic support.");
-            } else {
-                NickPaintsMod.LOGGER.warn("System font tahoma.ttf not found. Cyrillic characters may not render correctly.");
-            }
-
-            // Clean up the config object.
-            fontConfig.destroy();
-
-        } catch (Exception e) {
-            NickPaintsMod.LOGGER.error("Failed to load custom font for ImGui.", e);
-        }
         data.getFonts().build();
         data.setConfigFlags(ImGuiConfigFlags.DockingEnable);
 
-        // This is crucial: Build the font atlas.
         data.getFonts().build();
 
         imGuiImplGlfw.init(handle, true);
