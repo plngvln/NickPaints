@@ -55,21 +55,19 @@ public class ImGuiScreen extends Screen implements RenderInterface {
             Size=1920,1080
             Collapsed=0
             
-            [Window][Settings]
-            Pos=1631,0
-            Size=300,1080
+            [Window][Settings##Settings]
+            Size=333,1080
             Collapsed=0
             DockId=0x00000004,0
             
-            [Window][NickPaints Configuration]
-            Pos=0,0
+            [Window][NickPaints Configuration##NickPaintsConfig]
             Size=300,1080
             Collapsed=0
             DockId=0x00000001,0
             
             [Window][DockspaceHost]
             Pos=0,0
-            Size=1920,1080
+            Size=3440,1440
             Collapsed=0
             
             [Window][Debug##Default]
@@ -77,13 +75,29 @@ public class ImGuiScreen extends Screen implements RenderInterface {
             Size=400,400
             Collapsed=0
             
+            [Window][Настройки NickPaints##NickPaintsConfig]
+            Pos=0,0
+            Size=333,1080
+            Collapsed=0
+            DockId=0x00000007,0
+            
+            [Window][Настройки##Settings]
+            Pos=3172,0
+            Size=300,1080
+            Collapsed=0
+            DockId=0x00000006,0
+            
             [Docking][Data]
-            DockSpace     ID=0x38A10747 Pos=0,24 Size=1920,1056
-            DockSpace     ID=0xDAF01B52 Window=0x11EB8EBF Pos=0,0 Size=1920,1080 Split=X
-              DockNode    ID=0x00000003 Parent=0xDAF01B52 SizeRef=1629,1080 Split=X
-                DockNode  ID=0x00000001 Parent=0x00000003 SizeRef=333,1080 Selected=0xB107EC98
-                DockNode  ID=0x00000002 Parent=0x00000003 SizeRef=1294,1080 CentralNode=1
-              DockNode    ID=0x00000004 Parent=0xDAF01B52 SizeRef=289,1080 Selected=0x1C33C293
+            DockSpace         ID=0x38A10747 Pos=0,24 Size=1920,1056
+            DockSpace         ID=0xDAF01B52 Window=0x11EB8EBF Pos=0,0 Size=3440,1440 Split=X
+              DockNode        ID=0x00000007 Parent=0xDAF01B52 SizeRef=416,1440 Selected=0x690D7B6E
+              DockNode        ID=0x00000008 Parent=0xDAF01B52 SizeRef=3022,1440 Split=X
+                DockNode      ID=0x00000005 Parent=0x00000008 SizeRef=3170,1440 Split=X
+                  DockNode    ID=0x00000003 Parent=0x00000005 SizeRef=1629,1080 Split=X
+                    DockNode  ID=0x00000001 Parent=0x00000003 SizeRef=333,1080 Selected=0xB107EC98
+                    DockNode  ID=0x00000002 Parent=0x00000003 SizeRef=1294,1080 CentralNode=1
+                  DockNode    ID=0x00000004 Parent=0x00000005 SizeRef=289,1080 Selected=0x1C33C293
+                DockNode      ID=0x00000006 Parent=0x00000008 SizeRef=268,1440 Selected=0x8FAD21AA
             """;
 
     public ImGuiScreen() {
@@ -121,7 +135,7 @@ public class ImGuiScreen extends Screen implements RenderInterface {
      * Renders the main window for creating and editing gradients.
      */
     private void renderMainConfigurationWindow() {
-        ImGui.begin(Lang.get("gui.nickpaints.title"));
+        ImGui.begin(Lang.get("gui.nickpaints.title") + "##NickPaintsConfig");
 
         drawPreview();
         ImGui.separator();
@@ -158,7 +172,7 @@ public class ImGuiScreen extends Screen implements RenderInterface {
      * Renders the settings window, containing functionality from the old commands.
      */
     private void renderSettingsWindow() {
-        ImGui.begin(Lang.get("gui.nickpaints.settings.title"));
+        ImGui.begin(Lang.get("gui.nickpaints.settings.title") + "##Settings");
 
         // Global Toggle
         ImGui.text(Lang.get("gui.nickpaints.settings.global_rendering"));
