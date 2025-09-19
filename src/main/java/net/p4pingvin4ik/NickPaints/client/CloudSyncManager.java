@@ -66,7 +66,7 @@ public class CloudSyncManager {
     public static void queuePaintForPlayer(UUID playerUuid) {
         if (playerUuid != null && !paintCache.containsKey(playerUuid) && !inFlightUuids.contains(playerUuid)) {
             uuidQueue.add(playerUuid);
-            LOGGER.debug("Queued player for paint check: {}", playerUuid);
+            //LOGGER.debug("Queued player for paint check: {}", playerUuid);
         }
     }
 
@@ -135,7 +135,7 @@ public class CloudSyncManager {
                 paintCache.put(uuid, paint);
                 foundUuids.add(uuid);
             }
-            LOGGER.info("Received batch response. Found {} paints out of {}.", foundUuids.size(), sentBatch.size());
+            // LOGGER.info("Received batch response. Found {} paints out of {}.", foundUuids.size(), sentBatch.size());
         } catch (Exception e) {
             LOGGER.error("Failed to parse response from server. Body: {}", responseBody, e);
         } finally {
