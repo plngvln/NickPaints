@@ -61,7 +61,7 @@ public class ImGuiScreen extends Screen implements RenderInterface {
             DockId=0x00000004,0
             
             [Window][NickPaints Configuration##NickPaintsConfig]
-            Size=300,1080
+            Size=333,1080
             Collapsed=0
             DockId=0x00000001,0
             
@@ -83,7 +83,7 @@ public class ImGuiScreen extends Screen implements RenderInterface {
             
             [Window][Настройки##Settings]
             Pos=3172,0
-            Size=300,1080
+            Size=333,1080
             Collapsed=0
             DockId=0x00000006,0
             
