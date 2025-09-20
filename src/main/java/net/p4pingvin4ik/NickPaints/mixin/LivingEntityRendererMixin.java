@@ -3,6 +3,7 @@ package net.p4pingvin4ik.NickPaints.mixin;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.entity.LivingEntityRenderer;
 import net.minecraft.entity.LivingEntity;
+import net.p4pingvin4ik.NickPaints.config.ConfigManager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -18,6 +19,10 @@ public class LivingEntityRendererMixin {
      */
     @Inject(method = "hasLabel(Lnet/minecraft/entity/LivingEntity;D)Z", at = @At("HEAD"), cancellable = true)
     private void showOwnNametag(LivingEntity livingEntity, double d, CallbackInfoReturnable<Boolean> cir) {
+        if (!ConfigManager.CONFIG.showOwnNametag) {
+            return;
+        }
+
         MinecraftClient client = MinecraftClient.getInstance();
 
         // Check if the entity being rendered is the client's own player character.

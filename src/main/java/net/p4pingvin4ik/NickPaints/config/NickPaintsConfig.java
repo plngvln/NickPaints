@@ -15,6 +15,9 @@ public class NickPaintsConfig {
     // If false, no paints will be rendered at all, overriding per-player settings.
     public boolean globalRenderingEnabled = true;
 
+    // If true, the local player's own nametag will be rendered in third-person view.
+    public boolean showOwnNametag = true;
+
     // Stores players whose paints are locally disabled. Maps UUID to the last known username.
     public Map<UUID, String> disabledPlayers = new HashMap<>();
 
