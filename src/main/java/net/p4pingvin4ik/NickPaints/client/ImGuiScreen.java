@@ -56,12 +56,12 @@ public class ImGuiScreen extends Screen implements RenderInterface {
             Collapsed=0
             
             [Window][Settings##Settings]
-            Size=333,1080
+            Size=350,1080
             Collapsed=0
             DockId=0x00000004,0
             
             [Window][NickPaints Configuration##NickPaintsConfig]
-            Size=333,1080
+            Size=350,1080
             Collapsed=0
             DockId=0x00000001,0
             
@@ -72,32 +72,32 @@ public class ImGuiScreen extends Screen implements RenderInterface {
             
             [Window][Debug##Default]
             Pos=60,60
-            Size=333,1080
+            Size=350,1080
             Collapsed=0
             
             [Window][Настройки NickPaints##NickPaintsConfig]
             Pos=0,0
-            Size=333,1080
+            Size=350,1080
             Collapsed=0
             DockId=0x00000007,0
             
             [Window][Настройки##Settings]
             Pos=3172,0
-            Size=333,1080
+            Size=350,1080
             Collapsed=0
             DockId=0x00000006,0
             
             [Docking][Data]
             DockSpace         ID=0x38A10747 Pos=0,24 Size=1920,1056
             DockSpace         ID=0xDAF01B52 Window=0x11EB8EBF Pos=0,0 Size=3440,1440 Split=X
-              DockNode        ID=0x00000007 Parent=0xDAF01B52 SizeRef=333,1440 Selected=0x690D7B6E
+              DockNode        ID=0x00000007 Parent=0xDAF01B52 SizeRef=350,1440 Selected=0x690D7B6E
               DockNode        ID=0x00000008 Parent=0xDAF01B52 SizeRef=3022,1440 Split=X
                 DockNode      ID=0x00000005 Parent=0x00000008 SizeRef=3170,1440 Split=X
                   DockNode    ID=0x00000003 Parent=0x00000005 SizeRef=1629,1080 Split=X
-                    DockNode  ID=0x00000001 Parent=0x00000003 SizeRef=333,1080 Selected=0xB107EC98
+                    DockNode  ID=0x00000001 Parent=0x00000003 SizeRef=350,1080 Selected=0xB107EC98
                     DockNode  ID=0x00000002 Parent=0x00000003 SizeRef=1294,1080 CentralNode=1
-                  DockNode    ID=0x00000004 Parent=0x00000005 SizeRef=333,1080 Selected=0x1C33C293
-                DockNode      ID=0x00000006 Parent=0x00000008 SizeRef=333,1440 Selected=0x8FAD21AA
+                  DockNode    ID=0x00000004 Parent=0x00000005 SizeRef=350,1080 Selected=0x1C33C293
+                DockNode      ID=0x00000006 Parent=0x00000008 SizeRef=350,1440 Selected=0x8FAD21AA
             """;
 
     public ImGuiScreen() {
@@ -174,13 +174,22 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         ImGui.begin(Lang.get("gui.nickpaints.settings.title") + "##Settings");
 
         // Global Toggle
-        ImGui.text(Lang.get("gui.nickpaints.settings.global_rendering"));
-        ImGui.sameLine();
         boolean globalEnabled = ConfigManager.CONFIG.globalRenderingEnabled;
         if (ImGui.checkbox("##globaltoggle", globalEnabled)) {
             ConfigManager.CONFIG.setGlobalRendering(!globalEnabled);
             ConfigManager.saveConfig();
         }
+        ImGui.sameLine();
+        ImGui.text(Lang.get("gui.nickpaints.settings.global_rendering"));
+
+        // Disable own nametag
+        boolean showOwnNametag = ConfigManager.CONFIG.showOwnNametag;
+        if (ImGui.checkbox("##showownnametag", showOwnNametag)) {
+            ConfigManager.CONFIG.showOwnNametag = !showOwnNametag;
+            ConfigManager.saveConfig();
+        }
+        ImGui.sameLine();
+        ImGui.text(Lang.get("gui.nickpaints.settings.show_own_nametag"));
 
         ImGui.separator();
 
@@ -213,12 +222,12 @@ public class ImGuiScreen extends Screen implements RenderInterface {
             // Create a copy to prevent ConcurrentModificationException while rendering.
             List<Map.Entry<UUID, String>> disabledList = new ArrayList<>(ConfigManager.CONFIG.disabledPlayers.entrySet());
             for (Map.Entry<UUID, String> entry : disabledList) {
-                ImGui.text(entry.getValue());
-                ImGui.sameLine();
                 if (ImGui.button(Lang.get("gui.nickpaints.settings.reenable_button") + "##" + entry.getKey())) {
                     ConfigManager.CONFIG.setPlayerRendering(entry.getKey(), entry.getValue(), true);
                     ConfigManager.saveConfig();
                 }
+                ImGui.sameLine();
+                ImGui.text(entry.getValue());
             }
         }
         ImGui.endChild();
