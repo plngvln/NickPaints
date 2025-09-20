@@ -7,6 +7,7 @@ import imgui.extension.implot.ImPlot;
 import imgui.flag.ImGuiConfigFlags;
 import imgui.gl3.ImGuiImplGl3;
 import imgui.glfw.ImGuiImplGlfw;
+import imgui.type.ImInt;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.Framebuffer;
@@ -16,9 +17,12 @@ import net.p4pingvin4ik.NickPaints.client.NickPaintsMod;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
 
-
 import java.io.File;
+import java.nio.ByteBuffer;
 import java.nio.file.Path;
+
+import static org.lwjgl.opengl.ARBInternalformatQuery2.GL_TEXTURE_2D;
+import static org.lwjgl.opengl.GL11C.*;
 
 /**
  * This class handles the low-level initialization and rendering loop for ImGui.
@@ -28,7 +32,8 @@ import java.nio.file.Path;
 public class ImGuiImpl {
     private final static ImGuiImplGlfw imGuiImplGlfw = new ImGuiImplGlfw();
     private final static ImGuiImplGl3 imGuiImplGl3 = new ImGuiImplGl3();
-    private static final float FONT_SIZE_PIXELS = 20.0f;
+    private static final float FONT_SIZE_PIXELS = 18.0f;
+    private static int gFontTexture = -1;
     public static void create(final long handle) {
         ImGui.createContext();
         ImPlot.createContext();
@@ -64,8 +69,43 @@ public class ImGuiImpl {
 
         imGuiImplGlfw.init(handle, true);
         imGuiImplGl3.init();
+        updateFontsTexture();
     }
+//    private static byte[] readAllBytes(InputStream inputStream) throws IOException {
+//        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+//        int nRead;
+//        byte[] data = new byte[1024];
+//        while ((nRead = inputStream.read(data, 0, data.length)) != -1) {
+//            buffer.write(data, 0, nRead);
+//        }
+//        buffer.flush();
+//        return buffer.toByteArray();
+//    }
+    public static void updateFontsTexture() {
+        if (gFontTexture != -1) {
+            glDeleteTextures(gFontTexture);
+        }
 
+        final ImFontAtlas fontAtlas = ImGui.getIO().getFonts();
+        final ImInt width = new ImInt();
+        final ImInt height = new ImInt();
+        final ByteBuffer buffer = fontAtlas.getTexDataAsRGBA32(width, height);
+
+        gFontTexture = glGenTextures();
+
+        glBindTexture(GL_TEXTURE_2D, gFontTexture);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+        glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width.get(), height.get(), 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+
+        fontAtlas.setTexID(gFontTexture);
+    }
     public static void draw(final RenderInterface renderInterface) {
         // Minecraft will not bind the framebuffer unless it is needed, so do it manually and hope Vulcan never gets real:tm:
         final Framebuffer framebuffer = MinecraftClient.getInstance().getFramebuffer();
@@ -78,7 +118,7 @@ public class ImGuiImpl {
         ImGui.newFrame();
 
         // do rendering logic
-        renderInterface.render(ImGui.getIO());
+        renderInterface.gradientNickname$render(ImGui.getIO());
 
         // end frame
         ImGui.render();
@@ -97,6 +137,10 @@ public class ImGuiImpl {
     }
 
     public static void dispose() {
+        if (gFontTexture != -1) {
+            glDeleteTextures(gFontTexture);
+            gFontTexture = -1;
+        }
         imGuiImplGl3.dispose();
         imGuiImplGlfw.dispose();
         ImGui.destroyContext();

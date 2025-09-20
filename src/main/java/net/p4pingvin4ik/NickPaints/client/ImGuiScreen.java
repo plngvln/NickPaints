@@ -72,7 +72,7 @@ public class ImGuiScreen extends Screen implements RenderInterface {
             
             [Window][Debug##Default]
             Pos=60,60
-            Size=400,400
+            Size=333,1080
             Collapsed=0
             
             [Window][Настройки NickPaints##NickPaintsConfig]
@@ -90,14 +90,14 @@ public class ImGuiScreen extends Screen implements RenderInterface {
             [Docking][Data]
             DockSpace         ID=0x38A10747 Pos=0,24 Size=1920,1056
             DockSpace         ID=0xDAF01B52 Window=0x11EB8EBF Pos=0,0 Size=3440,1440 Split=X
-              DockNode        ID=0x00000007 Parent=0xDAF01B52 SizeRef=416,1440 Selected=0x690D7B6E
+              DockNode        ID=0x00000007 Parent=0xDAF01B52 SizeRef=333,1440 Selected=0x690D7B6E
               DockNode        ID=0x00000008 Parent=0xDAF01B52 SizeRef=3022,1440 Split=X
                 DockNode      ID=0x00000005 Parent=0x00000008 SizeRef=3170,1440 Split=X
                   DockNode    ID=0x00000003 Parent=0x00000005 SizeRef=1629,1080 Split=X
                     DockNode  ID=0x00000001 Parent=0x00000003 SizeRef=333,1080 Selected=0xB107EC98
                     DockNode  ID=0x00000002 Parent=0x00000003 SizeRef=1294,1080 CentralNode=1
-                  DockNode    ID=0x00000004 Parent=0x00000005 SizeRef=289,1080 Selected=0x1C33C293
-                DockNode      ID=0x00000006 Parent=0x00000008 SizeRef=268,1440 Selected=0x8FAD21AA
+                  DockNode    ID=0x00000004 Parent=0x00000005 SizeRef=333,1080 Selected=0x1C33C293
+                DockNode      ID=0x00000006 Parent=0x00000008 SizeRef=333,1440 Selected=0x8FAD21AA
             """;
 
     public ImGuiScreen() {
@@ -105,7 +105,7 @@ public class ImGuiScreen extends Screen implements RenderInterface {
     }
 
     @Override
-    public void render(ImGuiIO io) {
+    public void gradientNickname$render(ImGuiIO io) {
         if (isFirstFrame) {
             // Apply a default layout on first launch if no settings file exists.
             String iniPath = io.getIniFilename();
@@ -121,7 +121,6 @@ public class ImGuiScreen extends Screen implements RenderInterface {
 
         setupDockspace();
 
-        // Render our two main UI windows. They can be docked anywhere within the dockspace.
         renderMainConfigurationWindow();
         renderSettingsWindow();
 

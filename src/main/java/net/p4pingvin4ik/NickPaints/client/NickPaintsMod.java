@@ -33,7 +33,7 @@ public class NickPaintsMod implements ClientModInitializer {
             ImGuiImpl.create(client.getWindow().getHandle());
         });
 
-        keyBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.gradient_nickname.open_gui", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G, "category.gradient_nickname.main"));
+        keyBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.nickpaints.open_gui", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G, "category.nickpaints.main"));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (keyBinding.wasPressed()) {

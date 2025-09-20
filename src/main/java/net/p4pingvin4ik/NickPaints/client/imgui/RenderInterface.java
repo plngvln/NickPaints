@@ -7,5 +7,5 @@ import imgui.ImGuiIO;
  */
 @FunctionalInterface
 public interface RenderInterface {
-    void render(final ImGuiIO io);
+    void gradientNickname$render(final ImGuiIO io);
 }
