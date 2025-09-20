@@ -1,6 +1,6 @@
 {
-  "key.nickpaints.open_gui": "Открыть настройки раскраски",
-  "category.nickpaints.main": "Nick Paints",
+  "key.nickpaints.open_gui": "Открыть NickPaints",
+  "category.nickpaints.main": "NickPaints",
   "chat.nickpaints.sync.success": "Пейнт успешно синхронизирован с облаком!",
   "chat.nickpaints.sync.failure": "Ошибка синхронизации: %s",
   "chat.nickpaints.sync.auth_failed": "Ошибка аутентификации. Ваша сессия может быть недействительна. Попробуйте перезапустить игру.",
@@ -27,6 +27,7 @@
   "gui.nickpaints.button.close": "Закрыть",
   "gui.nickpaints.settings.title": "Настройки",
   "gui.nickpaints.settings.global_rendering": "Глобальный рендер пейнтов",
+  "gui.nickpaints.settings.show_own_nametag": "Показывать свой ник (от 3-го лица)",
   "gui.nickpaints.settings.disable_player_label": "Отключить пейнт для игрока:",
   "gui.nickpaints.settings.disable_button": "Отключить",
   "gui.nickpaints.settings.disabled_list": "Отключенные игроки:",

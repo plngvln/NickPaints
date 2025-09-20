@@ -1,6 +1,6 @@
 {
-  "key.nickpaints.open_gui": "Open Nick Paints Settings",
-  "category.nickpaints.main": "Nick Paints",
+  "key.nickpaints.open_gui": "Open NickPaints Settings",
+  "category.nickpaints.main": "NickPaints",
   "chat.nickpaints.sync.success": "Paint successfully synced with the cloud!",
   "chat.nickpaints.sync.failure": "Failed to sync paint: %s",
   "chat.nickpaints.sync.auth_failed": "Authentication failed. Your session might be invalid. Try restarting your game.",
@@ -27,6 +27,7 @@
   "gui.nickpaints.button.close": "Close",
   "gui.nickpaints.settings.title": "Settings",
   "gui.nickpaints.settings.global_rendering": "Global Paint Rendering",
+  "gui.nickpaints.settings.show_own_nametag": "Show Own Nametag (3rd Person)",
   "gui.nickpaints.settings.disable_player_label": "Disable Paint for Player:",
   "gui.nickpaints.settings.disable_button": "Disable",
   "gui.nickpaints.settings.disabled_list": "Disabled Players:",
