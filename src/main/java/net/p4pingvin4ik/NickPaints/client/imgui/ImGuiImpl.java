@@ -69,7 +69,6 @@ public class ImGuiImpl {
 
         imGuiImplGlfw.init(handle, true);
         imGuiImplGl3.init();
-        updateFontsTexture();
     }
 //    private static byte[] readAllBytes(InputStream inputStream) throws IOException {
 //        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
@@ -107,7 +106,9 @@ public class ImGuiImpl {
         fontAtlas.setTexID(gFontTexture);
     }
     public static void draw(final RenderInterface renderInterface) {
-        // Minecraft will not bind the framebuffer unless it is needed, so do it manually and hope Vulcan never gets real:tm:
+        if (gFontTexture == -1) {
+            updateFontsTexture();
+        }
         final Framebuffer framebuffer = MinecraftClient.getInstance().getFramebuffer();
         final int previousFramebuffer = ((GlTexture) framebuffer.getColorAttachment()).getOrCreateFramebuffer(((GlBackend) RenderSystem.getDevice()).getBufferManager(), null);
         GlStateManager._glBindFramebuffer(GL30.GL_FRAMEBUFFER, previousFramebuffer);
