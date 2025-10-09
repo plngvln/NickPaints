@@ -52,6 +52,7 @@ public class ImGuiScreen extends Screen implements RenderInterface {
     private final float[] mainConfigPos = new float[2];
     private final float[] mainConfigSize = new float[2];
     private final float[] settingsPos = new float[2];
+    private final float[] settingsSize = new float[2];
     private final float[] saveButtonPos = new float[2];
     // A simple layout to use if the user has no .ini file yet.
     private static final String DEFAULT_LAYOUT = """
@@ -149,13 +150,18 @@ public class ImGuiScreen extends Screen implements RenderInterface {
                 MinecraftClient.getInstance().getWindow().getFramebufferHeight(),
                 ImGui.getColorU32(0, 0, 0, 0.6f));
 
+        final float tutorialWidth = 300f;
+        final float margin = 15f;
+        final float viewportWidth = ImGui.getMainViewport().getSizeX();
+        final float viewportHeight = ImGui.getMainViewport().getSizeY();
+
         switch (tutorialStep) {
             case 0:
-                float centerX = ImGui.getMainViewport().getPosX() + ImGui.getMainViewport().getSizeX() * 0.5f;
-                float centerY = ImGui.getMainViewport().getPosY() + ImGui.getMainViewport().getSizeY() * 0.5f;
+                float centerX = ImGui.getMainViewport().getPosX() + viewportWidth * 0.5f;
+                float centerY = ImGui.getMainViewport().getPosY() + viewportHeight * 0.5f;
                 ImGui.setNextWindowPos(centerX, centerY, ImGuiCond.Appearing, 0.5f, 0.5f);
 
-                if(ImGui.begin("WelcomePopup##Tutorial", ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoTitleBar)) {
+                if(ImGui.begin("WelcomePopup##Tutorial", ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoCollapse)) {
                     ImGui.text(Lang.get("gui.nickpaints.tutorial.welcome.title"));
                     ImGui.separator();
                     ImGui.textWrapped(Lang.get("gui.nickpaints.tutorial.welcome.content"));
@@ -168,20 +174,28 @@ public class ImGuiScreen extends Screen implements RenderInterface {
                 break;
 
             case 1:
-                float step1X = mainConfigPos[0] + mainConfigSize[0] + 10;
-                float step1Y = mainConfigPos[1];
-                renderTutorialStep("gui.nickpaints.tutorial.step1", step1X, step1Y);
+                float step1X = mainConfigPos[0] + mainConfigSize[0] + margin;
+                if (step1X + tutorialWidth > viewportWidth) {
+                    step1X = mainConfigPos[0] - tutorialWidth - margin;
+                }
+                renderTutorialStep("gui.nickpaints.tutorial.step1", step1X, mainConfigPos[1]);
                 break;
 
             case 2:
-                float step2X = settingsPos[0] - 310;
-                float step2Y = settingsPos[1];
-                renderTutorialStep("gui.nickpaints.tutorial.step2", step2X, step2Y);
+
+                float step2X = settingsPos[0] - tutorialWidth - margin;
+                if (step2X < 0) {
+                    step2X = settingsPos[0] + settingsSize[0] + margin;
+                }
+                renderTutorialStep("gui.nickpaints.tutorial.step2", step2X, settingsPos[1]);
                 break;
 
             case 3:
                 float step3X = saveButtonPos[0];
                 float step3Y = saveButtonPos[1] + 30;
+                if (saveButtonPos[1] > viewportHeight / 2) {
+                    step3Y = saveButtonPos[1] - 120;
+                }
                 renderTutorialStep("gui.nickpaints.tutorial.step3", step3X, step3Y);
                 break;
         }
@@ -189,11 +203,32 @@ public class ImGuiScreen extends Screen implements RenderInterface {
 
     private void renderTutorialStep(String langKeyPrefix, float x, float y) {
         ImGui.setNextWindowSize(300, 0, ImGuiCond.Appearing);
+
+        final float viewportWidth = ImGui.getMainViewport().getSizeX();
+        final float viewportHeight = ImGui.getMainViewport().getSizeY();
+
+        if (x + 300 > viewportWidth) {
+            x = viewportWidth - 300;
+        }
+        if (x < 0) {
+            x = 0;
+        }
         ImGui.setNextWindowPos(x, y, ImGuiCond.Appearing);
 
         int flags = ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse;
 
         if (ImGui.begin(Lang.get(langKeyPrefix + ".title"), flags)) {
+
+            float windowHeight = ImGui.getWindowSizeY();
+            if (y + windowHeight > viewportHeight) {
+                y = viewportHeight - windowHeight;
+                ImGui.setWindowPos(x, y);
+            }
+            if (y < 0) {
+                y = 0;
+                ImGui.setWindowPos(x, y);
+            }
+
             ImGui.textWrapped(Lang.get(langKeyPrefix + ".content"));
             ImGui.separator();
 
