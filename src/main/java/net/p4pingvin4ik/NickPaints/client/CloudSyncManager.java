@@ -184,6 +184,44 @@ public class CloudSyncManager {
                 });
     }
 
+    /**
+     * Publishes the local player's current paint to the server silently.
+     * This is intended for automatic background tasks (e.g., on game startup)
+     * and will only log outcomes, not send messages to the player's chat.
+     * @param myUuid The UUID of the local player.
+     */
+    public static void syncMyPaintSilently(UUID myUuid) {
+        if (myUuid == null) return;
+        LOGGER.info("Automatic silent sync for local paint to server for UUID: {}", myUuid);
+
+        String accessToken = MinecraftClient.getInstance().getSession().getAccessToken();
+        String myPaint = ConfigManager.CONFIG.currentGradient;
+
+        String jsonBody = gson.toJson(Map.of(
+                "uuid", myUuid.toString(),
+                "paint", myPaint,
+                "accessToken", accessToken
+        ));
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + "/paint"))
+                .header("Content-Type", "application/json")
+                .header("X-API-Key", API_KEY)
+                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                .build();
+
+        client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenAccept(CloudSyncManager::handleSilentSyncResponse);
+    }
+
+    private static void handleSilentSyncResponse(HttpResponse<String> response) {
+        if (response.statusCode() >= 200 && response.statusCode() < 300) {
+            LOGGER.info("Successfully performed sync of paint. Response: {}", response.statusCode());
+        } else {
+            LOGGER.error("Failed to perform sync of paint. Code: {}, Body: {}", response.statusCode(), response.body());
+        }
+    }
+
     private static void handleSyncResponse(HttpResponse<String> response) {
         if (response.statusCode() >= 200 && response.statusCode() < 300) {
             LOGGER.info("Successfully synced paint. Response: {}", response.statusCode());
