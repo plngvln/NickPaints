@@ -36,5 +36,16 @@
   "gui.nickpaints.settings.disabled_list": "Отключенные игроки:",
   "gui.nickpaints.settings.none": "Нет",
   "gui.nickpaints.settings.reenable_button": "Включить",
-  "gui.nickpaints.settings.clear_cache_button": "Очистить кэш никнеймов"
+  "gui.nickpaints.settings.clear_cache_button": "Очистить кэш никнеймов",
+  "gui.nickpaints.tutorial.welcome.title": "Добро пожаловать в NickPaints!",
+  "gui.nickpaints.tutorial.welcome.content": "Этот короткий тур познакомит вас с основными функциями. Нажмите 'Начать тур', чтобы продолжить.",
+  "gui.nickpaints.tutorial.button.start": "Начать тур",
+  "gui.nickpaints.tutorial.button.next": "Далее",
+  "gui.nickpaints.tutorial.button.finish": "Завершить",
+  "gui.nickpaints.tutorial.step1.title": "1. Главное окно конфигурации",
+  "gui.nickpaints.tutorial.step1.content": "Здесь вы создаете свой градиент!\n\n- Предпросмотр: Ваш ник с градиентом в реальном времени.\n- Цвета: Добавляйте, удаляйте и выбирайте цвета.\n- Опции: Управляйте скоростью анимации, стилем и направлением.",
+  "gui.nickpaints.tutorial.step2.title": "2. Окно настроек",
+  "gui.nickpaints.tutorial.step2.content": "Это окно управляет поведением мода.\n\n- Переключатели: Включайте/отключайте рендер глобально или для своего ника.\n- Отключить игрока: Прекратите видеть градиент для конкретных игроков.\n- Очистить кэш: Обновите все градиенты, если они кажутся устаревшими.",
+  "gui.nickpaints.tutorial.step3.title": "3. Сохранить и синхронизировать",
+  "gui.nickpaints.tutorial.step3.content": "Это самая важная кнопка!\n\nНажмите 'Сохранить и синхр.', чтобы применить изменения и загрузить ваш градиент, чтобы другие игроки могли его видеть."
 }

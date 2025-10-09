@@ -23,6 +23,8 @@ public class NickPaintsConfig {
 
     public boolean hasShownWelcomeMessage = false;
 
+    public boolean hasCompletedGuiTutorial = false;
+
     public boolean setGlobalRendering(boolean enabled) {
         this.globalRenderingEnabled = enabled;
         return this.globalRenderingEnabled;

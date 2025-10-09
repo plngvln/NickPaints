@@ -46,9 +46,13 @@ public class ImGuiScreen extends Screen implements RenderInterface {
 
     // --- State Management for the Settings Window ---
     private final ImString playerToDisableInput = new ImString(32);
-
+    private int tutorialStep = 0;
+    private boolean isTutorialActive = false;
     private boolean isFirstFrame = true;
-
+    private final float[] mainConfigPos = new float[2];
+    private final float[] mainConfigSize = new float[2];
+    private final float[] settingsPos = new float[2];
+    private final float[] saveButtonPos = new float[2];
     // A simple layout to use if the user has no .ini file yet.
     private static final String DEFAULT_LAYOUT = """
             [Window][Dockspace Host]
@@ -116,25 +120,108 @@ public class ImGuiScreen extends Screen implements RenderInterface {
                 }
             }
             parseGradientString(ConfigManager.CONFIG.currentGradient);
+            isTutorialActive = !ConfigManager.CONFIG.hasCompletedGuiTutorial;
             isFirstFrame = false;
         }
 
         setupDockspace();
 
+        if (isTutorialActive) {
+            ImGui.beginDisabled();
+        }
+
         renderMainConfigurationWindow();
         renderSettingsWindow();
 
+        if (isTutorialActive) {
+            ImGui.endDisabled();
+            renderTutorial();
+        }
         ImGui.end(); // End the Dockspace Host window
     }
     @Override
     public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
         // Do nothing.
     }
+    private void renderTutorial() {
+        ImGui.getBackgroundDrawList().addRectFilled(0, 0,
+                MinecraftClient.getInstance().getWindow().getFramebufferWidth(),
+                MinecraftClient.getInstance().getWindow().getFramebufferHeight(),
+                ImGui.getColorU32(0, 0, 0, 0.6f));
+
+        switch (tutorialStep) {
+            case 0:
+                float centerX = ImGui.getMainViewport().getPosX() + ImGui.getMainViewport().getSizeX() * 0.5f;
+                float centerY = ImGui.getMainViewport().getPosY() + ImGui.getMainViewport().getSizeY() * 0.5f;
+                ImGui.setNextWindowPos(centerX, centerY, ImGuiCond.Appearing, 0.5f, 0.5f);
+
+                if(ImGui.begin("WelcomePopup##Tutorial", ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoTitleBar)) {
+                    ImGui.text(Lang.get("gui.nickpaints.tutorial.welcome.title"));
+                    ImGui.separator();
+                    ImGui.textWrapped(Lang.get("gui.nickpaints.tutorial.welcome.content"));
+                    ImGui.spacing();
+                    if (ImGui.button(Lang.get("gui.nickpaints.tutorial.button.start"))) {
+                        tutorialStep++;
+                    }
+                    ImGui.end();
+                }
+                break;
+
+            case 1:
+                float step1X = mainConfigPos[0] + mainConfigSize[0] + 10;
+                float step1Y = mainConfigPos[1];
+                renderTutorialStep("gui.nickpaints.tutorial.step1", step1X, step1Y);
+                break;
+
+            case 2:
+                float step2X = settingsPos[0] - 310;
+                float step2Y = settingsPos[1];
+                renderTutorialStep("gui.nickpaints.tutorial.step2", step2X, step2Y);
+                break;
+
+            case 3:
+                float step3X = saveButtonPos[0];
+                float step3Y = saveButtonPos[1] + 30;
+                renderTutorialStep("gui.nickpaints.tutorial.step3", step3X, step3Y);
+                break;
+        }
+    }
+
+    private void renderTutorialStep(String langKeyPrefix, float x, float y) {
+        ImGui.setNextWindowSize(300, 0, ImGuiCond.Appearing);
+        ImGui.setNextWindowPos(x, y, ImGuiCond.Appearing);
+
+        int flags = ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse;
+
+        if (ImGui.begin(Lang.get(langKeyPrefix + ".title"), flags)) {
+            ImGui.textWrapped(Lang.get(langKeyPrefix + ".content"));
+            ImGui.separator();
+
+            if (tutorialStep < 3) {
+                if (ImGui.button(Lang.get("gui.nickpaints.tutorial.button.next"))) {
+                    tutorialStep++;
+                }
+            } else {
+                if (ImGui.button(Lang.get("gui.nickpaints.tutorial.button.finish"))) {
+                    ConfigManager.CONFIG.hasCompletedGuiTutorial = true;
+                    ConfigManager.saveConfig();
+                    isTutorialActive = false;
+                }
+            }
+            ImGui.end();
+        }
+    }
+
     /**
      * Renders the main window for creating and editing gradients.
      */
     private void renderMainConfigurationWindow() {
         ImGui.begin(Lang.get("gui.nickpaints.title") + "##NickPaintsConfig");
+
+        mainConfigPos[0] = ImGui.getWindowPosX();
+        mainConfigPos[1] = ImGui.getWindowPosY();
+        mainConfigSize[0] = ImGui.getWindowSizeX();
+        mainConfigSize[1] = ImGui.getWindowSizeY();
 
         drawPreview();
         ImGui.separator();
@@ -159,6 +246,9 @@ public class ImGuiScreen extends Screen implements RenderInterface {
                 CloudSyncManager.syncMyPaint(MinecraftClient.getInstance().player.getUuid());
             }
         }
+        saveButtonPos[0] = ImGui.getItemRectMinX();
+        saveButtonPos[1] = ImGui.getItemRectMinY();
+
         ImGui.sameLine();
         if (ImGui.button(Lang.get("gui.nickpaints.button.close"))) {
             this.close();
@@ -172,6 +262,9 @@ public class ImGuiScreen extends Screen implements RenderInterface {
      */
     private void renderSettingsWindow() {
         ImGui.begin(Lang.get("gui.nickpaints.settings.title") + "##Settings");
+
+        settingsPos[0] = ImGui.getWindowPosX();
+        settingsPos[1] = ImGui.getWindowPosY();
 
         // Global Toggle
         boolean globalEnabled = ConfigManager.CONFIG.globalRenderingEnabled;

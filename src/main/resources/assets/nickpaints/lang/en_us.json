@@ -36,5 +36,16 @@
   "gui.nickpaints.settings.disabled_list": "Disabled Players:",
   "gui.nickpaints.settings.none": "None",
   "gui.nickpaints.settings.reenable_button": "Re-enable",
-  "gui.nickpaints.settings.clear_cache_button": "Clear Nickname Cache"
+  "gui.nickpaints.settings.clear_cache_button": "Clear Nickname Cache",
+  "gui.nickpaints.tutorial.welcome.title": "Welcome to NickPaints!",
+  "gui.nickpaints.tutorial.welcome.content": "This short tour will guide you through the main features. Click 'Start Tour' to begin.",
+  "gui.nickpaints.tutorial.button.start": "Start Tour",
+  "gui.nickpaints.tutorial.button.next": "Next",
+  "gui.nickpaints.tutorial.button.finish": "Finish",
+  "gui.nickpaints.tutorial.step1.title": "1. Main Configuration Window",
+  "gui.nickpaints.tutorial.step1.content": "This is where you create your gradient!\n\n- Preview: See your nickname live.\n- Colors: Add, remove, and pick colors for the gradient.\n- Options: Control animation speed, style, and direction.",
+  "gui.nickpaints.tutorial.step2.title": "2. Settings Window",
+  "gui.nickpaints.tutorial.step2.content": "This window controls how the mod behaves.\n\n- Toggles: Enable/disable rendering globally or for your own nametag.\n- Disable Player: Stop seeing the paint of specific players.\n- Clear Cache: Refresh all paints if they seem outdated.",
+  "gui.nickpaints.tutorial.step3.title": "3. Save & Sync",
+  "gui.nickpaints.tutorial.step3.content": "This is the most important button!\n\nClick 'Save & Sync' to apply your changes and upload your paint for other players to see."
 }
