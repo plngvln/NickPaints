@@ -70,16 +70,7 @@ public class ImGuiImpl {
         imGuiImplGlfw.init(handle, true);
         imGuiImplGl3.init();
     }
-//    private static byte[] readAllBytes(InputStream inputStream) throws IOException {
-//        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-//        int nRead;
-//        byte[] data = new byte[1024];
-//        while ((nRead = inputStream.read(data, 0, data.length)) != -1) {
-//            buffer.write(data, 0, nRead);
-//        }
-//        buffer.flush();
-//        return buffer.toByteArray();
-//    }
+
     public static void updateFontsTexture() {
         if (gFontTexture != -1) {
             glDeleteTextures(gFontTexture);
@@ -127,14 +118,6 @@ public class ImGuiImpl {
 
         GlStateManager._glBindFramebuffer(GL30.GL_FRAMEBUFFER, previousFramebuffer);
 
-// Add this code if you have enabled Viewports in the create method
-//        if (ImGui.getIO().hasConfigFlags(ImGuiConfigFlags.ViewportsEnable)) {
-//            final long pointer = GLFW.glfwGetCurrentContext();
-//            ImGui.updatePlatformWindows();
-//            ImGui.renderPlatformWindowsDefault();
-//
-//            GLFW.glfwMakeContextCurrent(pointer);
-//        }
     }
 
     public static void dispose() {

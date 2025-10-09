@@ -21,8 +21,7 @@ public class NickPaintsConfig {
     // Stores players whose paints are locally disabled. Maps UUID to the last known username.
     public Map<UUID, String> disabledPlayers = new HashMap<>();
 
-    // --- Instance Methods for Logic ---
-    // These methods operate on the instance data, making the config object self-contained.
+    public boolean hasShownWelcomeMessage = false;
 
     public boolean setGlobalRendering(boolean enabled) {
         this.globalRenderingEnabled = enabled;

@@ -6,7 +6,12 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.session.Session;
 import net.minecraft.client.util.InputUtil;
+import net.minecraft.text.ClickEvent;
+import net.minecraft.text.HoverEvent;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.p4pingvin4ik.NickPaints.client.commands.NickPaintsCommands;
 import net.p4pingvin4ik.NickPaints.client.imgui.ImGuiImpl;
 import net.p4pingvin4ik.NickPaints.config.ConfigManager;
@@ -31,9 +36,11 @@ public class NickPaintsMod implements ClientModInitializer {
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
             LOGGER.info("initializing NickPaints...");
             ImGuiImpl.create(client.getWindow().getHandle());
+            Session session = client.getSession();
+            CloudSyncManager.syncMyPaintSilently(session.getUuidOrNull());
         });
 
-        keyBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.nickpaints.open_gui", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G, "category.nickpaints.main"));
+        keyBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.nickpaints.open_gui", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_MINUS, "category.nickpaints.main"));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (keyBinding.wasPressed()) {
@@ -43,7 +50,35 @@ public class NickPaintsMod implements ClientModInitializer {
         });
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             VersionChecker.onPlayerJoin();
+
+            if (!ConfigManager.CONFIG.hasShownWelcomeMessage) {
+                new Thread(() -> {
+                    try {
+                        Thread.sleep(1500);
+                        if (client.player != null) {
+                            client.player.sendMessage(createWelcomeMessage(), false);
+                        }
+                        ConfigManager.CONFIG.hasShownWelcomeMessage = true;
+                        ConfigManager.saveConfig();
+                    } catch (InterruptedException e) {
+                        LOGGER.error("Failed to send NickPaints welcome message", e);
+                    }
+                }).start();
+            }
         });
         LOGGER.info("NickPaints Mod initialized.");
+    }
+    private Text createWelcomeMessage() {
+        return Text.literal("[NickPaints] ").formatted(Formatting.AQUA)
+                .append(Text.translatable("chat.nickpaints.welcome.main").formatted(Formatting.WHITE))
+                .append(" ")
+                .append(Text.translatable("chat.nickpaints.welcome.click")
+                        .formatted(Formatting.YELLOW, Formatting.BOLD)
+                        .styled(style -> style
+                                .withClickEvent(new ClickEvent.RunCommand("/nickpaints"))
+                                .withHoverEvent(new HoverEvent.ShowText(Text.translatable("chat.nickpaints.welcome.hover")))
+                        )
+                )
+                .append(Text.literal(".").formatted(Formatting.GRAY));
     }
 }

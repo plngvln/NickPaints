@@ -7,10 +7,12 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.command.CommandRegistryAccess;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.p4pingvin4ik.NickPaints.client.CloudSyncManager;
+import net.p4pingvin4ik.NickPaints.client.ImGuiScreen;
 import net.p4pingvin4ik.NickPaints.client.MojangAPIHelper;
 import net.p4pingvin4ik.NickPaints.config.ConfigManager;
 
@@ -29,7 +31,9 @@ public class NickPaintsCommands {
     private static void registerCommands(CommandDispatcher<FabricClientCommandSource> dispatcher, CommandRegistryAccess registryAccess) {
         dispatcher.register(literal("nickpaints")
                 .executes(context -> {
-                    context.getSource().sendFeedback(Text.literal("Usage: /nickpaints <subcommand>"));
+                    MinecraftClient.getInstance().execute(() -> {
+                        MinecraftClient.getInstance().setScreen(new ImGuiScreen());
+                    });
                     return 1;
                 })
                 .then(literal("clear-cache")
@@ -50,7 +54,7 @@ public class NickPaintsCommands {
                                 .then(argument("enabled", BoolArgumentType.bool())
                                         .executes(context -> {
                                             boolean enabled = BoolArgumentType.getBool(context, "enabled");
-                                           ConfigManager.CONFIG.setGlobalRendering(enabled);
+                                            ConfigManager.CONFIG.setGlobalRendering(enabled);
                                             ConfigManager.saveConfig();
                                             sendToggleFeedback(context.getSource(), "Global paint rendering", enabled);
                                             return 1;
@@ -62,7 +66,6 @@ public class NickPaintsCommands {
                                         .suggests(NickPaintsCommands::getPlayerSuggestions)
                                         .executes(context -> {
                                             String username = StringArgumentType.getString(context, "username");
-                                            // The save call is now inside this helper method.
                                             togglePlayerSetting(context.getSource(), username, null);
                                             return 1;
                                         })
@@ -70,7 +73,6 @@ public class NickPaintsCommands {
                                                 .executes(context -> {
                                                     String username = StringArgumentType.getString(context, "username");
                                                     boolean enabled = BoolArgumentType.getBool(context, "enabled");
-                                                    // The save call is now inside this helper method.
                                                     togglePlayerSetting(context.getSource(), username, enabled);
                                                     return 1;
                                                 })
@@ -87,7 +89,7 @@ public class NickPaintsCommands {
                                     if (ConfigManager.CONFIG.disabledPlayers.isEmpty()) {
                                         context.getSource().sendFeedback(Text.literal("  None").formatted(Formatting.GRAY));
                                     } else {
-                                       ConfigManager.CONFIG.disabledPlayers.forEach((uuid, name) -> {
+                                        ConfigManager.CONFIG.disabledPlayers.forEach((uuid, name) -> {
                                             context.getSource().sendFeedback(
                                                     Text.literal("  - " + name).formatted(Formatting.GRAY)
                                                             .append(Text.literal(" (" + uuid.toString() + ")").formatted(Formatting.DARK_GRAY))
@@ -106,7 +108,7 @@ public class NickPaintsCommands {
         context.getSource().getPlayerNames().stream()
                 .filter(name -> name.toLowerCase().startsWith(input))
                 .forEach(builder::suggest);
-       ConfigManager.CONFIG.getDisabledPlayerNames().stream()
+        ConfigManager.CONFIG.getDisabledPlayerNames().stream()
                 .filter(name -> name.toLowerCase().startsWith(input))
                 .forEach(builder::suggest);
         return builder.buildFuture();
@@ -124,7 +126,7 @@ public class NickPaintsCommands {
                 boolean isCurrentlyDisabled = ConfigManager.CONFIG.disabledPlayers.containsKey(playerUuid);
                 boolean newState = (enabledState != null) ? enabledState : isCurrentlyDisabled;
 
-               ConfigManager.CONFIG.setPlayerRendering(playerUuid, username, newState);
+                ConfigManager.CONFIG.setPlayerRendering(playerUuid, username, newState);
 
                 ConfigManager.saveConfig();
 
