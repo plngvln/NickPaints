@@ -161,7 +161,7 @@ public class ImGuiScreen extends Screen implements RenderInterface {
                 float centerY = ImGui.getMainViewport().getPosY() + viewportHeight * 0.5f;
                 ImGui.setNextWindowPos(centerX, centerY, ImGuiCond.Appearing, 0.5f, 0.5f);
 
-                if(ImGui.begin("WelcomePopup##Tutorial", ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoCollapse)) {
+                if(ImGui.begin("WelcomePopup##Tutorial", ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoDocking)) {
                     ImGui.text(Lang.get("gui.nickpaints.tutorial.welcome.title"));
                     ImGui.separator();
                     ImGui.textWrapped(Lang.get("gui.nickpaints.tutorial.welcome.content"));

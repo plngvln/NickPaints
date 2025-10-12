@@ -13,7 +13,6 @@ import net.minecraft.text.HoverEvent;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.p4pingvin4ik.NickPaints.client.commands.NickPaintsCommands;
-import net.p4pingvin4ik.NickPaints.client.imgui.ImGuiImpl;
 import net.p4pingvin4ik.NickPaints.config.ConfigManager;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
@@ -23,6 +22,7 @@ public class NickPaintsMod implements ClientModInitializer {
 
     public static final String MOD_ID = "nickpaints";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+    public static final String PROTECTED_TAG_INSERTION_KEY = "NICKPAINTS_PROTECTED_V1";
 
     private static KeyBinding keyBinding;
 
@@ -35,7 +35,6 @@ public class NickPaintsMod implements ClientModInitializer {
 
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
             LOGGER.info("initializing NickPaints...");
-            ImGuiImpl.create(client.getWindow().getHandle());
             Session session = client.getSession();
             CloudSyncManager.syncMyPaintSilently(session.getUuidOrNull());
         });

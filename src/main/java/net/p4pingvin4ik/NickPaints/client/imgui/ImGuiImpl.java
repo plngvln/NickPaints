@@ -34,7 +34,12 @@ public class ImGuiImpl {
     private final static ImGuiImplGl3 imGuiImplGl3 = new ImGuiImplGl3();
     private static final float FONT_SIZE_PIXELS = 20.0f;
     private static int gFontTexture = -1;
+    private static boolean isImGuiInitialized = false;
+    private static boolean areBackendsInitialized = false;
+
     public static void create(final long handle) {
+        if (isImGuiInitialized) return;
+
         ImGui.createContext();
         ImPlot.createContext();
 
@@ -69,6 +74,15 @@ public class ImGuiImpl {
 
         imGuiImplGlfw.init(handle, true);
         imGuiImplGl3.init();
+
+        isImGuiInitialized = true;
+    }
+
+    private static void initializeBackends(final long handle) {
+        if (areBackendsInitialized) return;
+        imGuiImplGlfw.init(handle, false);
+        imGuiImplGl3.init();
+        areBackendsInitialized = true;
     }
 
     public static void updateFontsTexture() {
@@ -97,8 +111,12 @@ public class ImGuiImpl {
         fontAtlas.setTexID(gFontTexture);
     }
     public static void draw(final RenderInterface renderInterface) {
-        if (gFontTexture == -1) {
-            updateFontsTexture();
+
+        if (!isImGuiInitialized) {
+            create(MinecraftClient.getInstance().getWindow().getHandle());
+        }
+        if (!areBackendsInitialized) {
+            initializeBackends(MinecraftClient.getInstance().getWindow().getHandle());
         }
         final Framebuffer framebuffer = MinecraftClient.getInstance().getFramebuffer();
         final int previousFramebuffer = ((GlTexture) framebuffer.getColorAttachment()).getOrCreateFramebuffer(((GlBackend) RenderSystem.getDevice()).getBufferManager(), null);
@@ -117,10 +135,14 @@ public class ImGuiImpl {
         imGuiImplGl3.renderDrawData(ImGui.getDrawData());
 
         GlStateManager._glBindFramebuffer(GL30.GL_FRAMEBUFFER, previousFramebuffer);
-
+        if (gFontTexture == -1) {
+            updateFontsTexture();
+        }
     }
 
     public static void dispose() {
+        if (!isImGuiInitialized) return;
+
         if (gFontTexture != -1) {
             glDeleteTextures(gFontTexture);
             gFontTexture = -1;
@@ -128,5 +150,6 @@ public class ImGuiImpl {
         imGuiImplGl3.dispose();
         imGuiImplGlfw.dispose();
         ImGui.destroyContext();
+        isImGuiInitialized = false;
     }
 }
