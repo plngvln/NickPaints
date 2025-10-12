@@ -10,13 +10,14 @@ import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.text.TextColor;
 import net.p4pingvin4ik.NickPaints.client.CloudSyncManager;
+import net.p4pingvin4ik.NickPaints.client.NickPaintsMod;
 import net.p4pingvin4ik.NickPaints.config.ConfigManager;
 import net.p4pingvin4ik.NickPaints.interfaces.IEntityProvider;
 import net.p4pingvin4ik.NickPaints.util.GradientUtil;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
-
+import net.minecraft.text.PlainTextContent;
 /**
  * This mixin uses a more compatible approach to apply gradients. Instead of cancelling the render method
  * and reimplementing it, we modify the `Text` object just before it's rendered. This preserves
@@ -62,22 +63,58 @@ public abstract class EntityRendererMixin<T extends Entity, S extends EntityRend
             return originalText;
         }
 
-        String name = originalText.getString();
-        MutableText newText = Text.empty(); // Start with an empty, mutable text object.
-
-        for (int i = 0; i < name.length(); i++) {
-            // Get the color for this character from our utility.
-            int color = GradientUtil.getColor(paintToShow, i, name.length());
-
-            // Create a style with only the calculated color.
-            Style style = Style.EMPTY.withColor(TextColor.fromRgb(color));
-
-            // Append a new text component for this single character with its unique style.
-            newText.append(Text.literal(String.valueOf(name.charAt(i))).setStyle(style));
+        int totalLengthForGradient = calculatePaintableLength(originalText);
+        if (totalLengthForGradient == 0) {
+            return originalText; // Нечего красить
         }
 
-        // Return the newly constructed, fully colorized text object.
-        // The original renderLabelIfPresent method will now render THIS text instead of the old one.
+        MutableText newText = Text.empty();
+        processTextComponent(originalText, newText, paintToShow, totalLengthForGradient, 0);
+
         return newText;
+    }
+
+    private int processTextComponent(Text component, MutableText builder, String paint, int totalLength, int paintedChars) {
+        if (NickPaintsMod.PROTECTED_TAG_INSERTION_KEY.equals(component.getStyle().getInsertion())) {
+            builder.append(component.copy());
+            return paintedChars;
+        }
+
+        // Используем правильное имя класса: PlainTextContent
+        if (component.getContent() instanceof PlainTextContent literalContent) {
+            String text = literalContent.string();
+            for (int i = 0; i < text.length(); i++) {
+                int color = GradientUtil.getColor(paint, paintedChars + i, totalLength);
+                Style originalStyle = component.getStyle();
+                Style newStyle = originalStyle.withColor(TextColor.fromRgb(color));
+                builder.append(Text.literal(String.valueOf(text.charAt(i))).setStyle(newStyle));
+            }
+            paintedChars += text.length();
+        } else {
+            builder.append(component.copy());
+        }
+
+        for (Text sibling : component.getSiblings()) {
+            paintedChars = processTextComponent(sibling, builder, paint, totalLength, paintedChars);
+        }
+
+        return paintedChars;
+    }
+
+    private int calculatePaintableLength(Text component) {
+        if (NickPaintsMod.PROTECTED_TAG_INSERTION_KEY.equals(component.getStyle().getInsertion())) {
+            return 0;
+        }
+
+        int length = 0;
+        // Используем правильное имя класса: PlainTextContent
+        if (component.getContent() instanceof PlainTextContent literalContent) {
+            length = literalContent.string().length();
+        }
+
+        for (Text sibling : component.getSiblings()) {
+            length += calculatePaintableLength(sibling);
+        }
+        return length;
     }
 }
