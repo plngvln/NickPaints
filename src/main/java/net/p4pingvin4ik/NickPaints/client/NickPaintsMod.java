@@ -26,6 +26,7 @@ public class NickPaintsMod implements ClientModInitializer {
 
     private static KeyBinding keyBinding;
 
+    static {Runtime.getRuntime().addShutdownHook(new Thread(WebSocketManager::disconnect));}
 
     @Override
     public void onInitializeClient() {
@@ -36,7 +37,7 @@ public class NickPaintsMod implements ClientModInitializer {
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
             LOGGER.info("initializing NickPaints...");
             Session session = client.getSession();
-            CloudSyncManager.syncMyPaintSilently(session.getUuidOrNull());
+            WebSocketManager.syncMyPaintSilently(session.getUuidOrNull());
         });
 
         keyBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.nickpaints.open_gui", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_MINUS, "category.nickpaints.main"));
@@ -45,9 +46,10 @@ public class NickPaintsMod implements ClientModInitializer {
             if (keyBinding.wasPressed()) {
                 client.setScreen(new ImGuiScreen());
             }
-            CloudSyncManager.processQueue();
+            WebSocketManager.updateVisiblePlayers();
         });
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            WebSocketManager.connect();
             VersionChecker.onPlayerJoin();
 
             if (!ConfigManager.CONFIG.hasShownWelcomeMessage) {

@@ -30,6 +30,10 @@ public class NickPaintsConfig {
         return this.globalRenderingEnabled;
     }
 
+    public String baseUrl = "ws://localhost:3000";
+
+    public String apiKey = "20oymFVk6uOPmY0s6/XLiHgS--yF=LsQuJ0x/hgzOBCDZ8yvG-hvZyNBFttmodyj";
+
     public boolean setPlayerRendering(UUID playerUuid, String username, boolean enabled) {
         if (enabled) {
             this.disabledPlayers.remove(playerUuid);

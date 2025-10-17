@@ -11,9 +11,9 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.command.CommandRegistryAccess;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import net.p4pingvin4ik.NickPaints.client.CloudSyncManager;
 import net.p4pingvin4ik.NickPaints.client.ImGuiScreen;
 import net.p4pingvin4ik.NickPaints.client.MojangAPIHelper;
+import net.p4pingvin4ik.NickPaints.client.WebSocketManager;
 import net.p4pingvin4ik.NickPaints.config.ConfigManager;
 
 import java.util.UUID;
@@ -38,7 +38,7 @@ public class NickPaintsCommands {
                 })
                 .then(literal("clear-cache")
                         .executes(context -> {
-                            CloudSyncManager.clearCache();
+                            WebSocketManager.clearCache();
                             context.getSource().sendFeedback(Text.literal("NickPaints cache cleared. Nicknames will be re-fetched."));
                             return 1;
                         })

@@ -9,8 +9,8 @@ import net.minecraft.text.MutableText;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.text.TextColor;
-import net.p4pingvin4ik.NickPaints.client.CloudSyncManager;
 import net.p4pingvin4ik.NickPaints.client.NickPaintsMod;
+import net.p4pingvin4ik.NickPaints.client.WebSocketManager;
 import net.p4pingvin4ik.NickPaints.config.ConfigManager;
 import net.p4pingvin4ik.NickPaints.interfaces.IEntityProvider;
 import net.p4pingvin4ik.NickPaints.util.GradientUtil;
@@ -50,11 +50,11 @@ public abstract class EntityRendererMixin<T extends Entity, S extends EntityRend
         if (player.equals(MinecraftClient.getInstance().player)) {
             paintToShow = ConfigManager.CONFIG.currentGradient;
         } else {
-            String cachedPaint = CloudSyncManager.paintCache.get(player.getUuid());
+            String cachedPaint = WebSocketManager.paintCache.get(player.getUuid());
             if (cachedPaint != null && !cachedPaint.equals("no_paint") && !cachedPaint.equals("fetching")) {
                 paintToShow = cachedPaint;
             } else if (cachedPaint == null) {
-                CloudSyncManager.queuePaintForPlayer(player.getUuid());
+                WebSocketManager.queuePaintForPlayer(player.getUuid());
             }
         }
 
@@ -65,7 +65,7 @@ public abstract class EntityRendererMixin<T extends Entity, S extends EntityRend
 
         int totalLengthForGradient = calculatePaintableLength(originalText);
         if (totalLengthForGradient == 0) {
-            return originalText; // Нечего красить
+            return originalText;
         }
 
         MutableText newText = Text.empty();
@@ -80,7 +80,6 @@ public abstract class EntityRendererMixin<T extends Entity, S extends EntityRend
             return paintedChars;
         }
 
-        // Используем правильное имя класса: PlainTextContent
         if (component.getContent() instanceof PlainTextContent literalContent) {
             String text = literalContent.string();
             for (int i = 0; i < text.length(); i++) {
@@ -107,7 +106,7 @@ public abstract class EntityRendererMixin<T extends Entity, S extends EntityRend
         }
 
         int length = 0;
-        // Используем правильное имя класса: PlainTextContent
+
         if (component.getContent() instanceof PlainTextContent literalContent) {
             length = literalContent.string().length();
         }

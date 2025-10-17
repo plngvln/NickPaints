@@ -278,7 +278,7 @@ public class ImGuiScreen extends Screen implements RenderInterface {
             ConfigManager.CONFIG.currentGradient = reconstructGradientString();
             ConfigManager.saveConfig();
             if (MinecraftClient.getInstance().player != null) {
-                CloudSyncManager.syncMyPaint(MinecraftClient.getInstance().player.getUuid());
+                WebSocketManager.syncMyPaint();
             }
         }
         saveButtonPos[0] = ImGui.getItemRectMinX();
@@ -362,7 +362,7 @@ public class ImGuiScreen extends Screen implements RenderInterface {
 
         // Clear Cache Button
         if (ImGui.button(Lang.get("gui.nickpaints.settings.clear_cache_button"))) {
-            CloudSyncManager.clearCache();
+            WebSocketManager.clearCache();
         }
 
         ImGui.end();
