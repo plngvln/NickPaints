@@ -4,12 +4,13 @@
   "package": "net.p4pingvin4ik.NickPaints.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "EntityRendererMixin",
-    "LivingEntityRendererMixin",
     "EntityRendererPopulatorMixin",
-    "EntityRenderStateMixin"
+    "EntityRenderStateMixin",
+    "LivingEntityRendererMixin"
   ],
   "client": [
+    "BakedGlyphMixin",
+    "EntityRendererMixin",
     "GameRendererMixin",
     "MinecraftClientMixin"
   ],
