@@ -12,6 +12,9 @@ public class NickPaintsConfig {
     // The gradient string used for the local player's nametag.
     public String currentGradient = "rainbow(3000)";
 
+    // Stores a list of user-saved gradient presets.
+    public List<String> presets = new ArrayList<>();
+
     // If false, no paints will be rendered at all, overriding per-player settings.
     public boolean globalRenderingEnabled = true;
 
@@ -30,7 +33,7 @@ public class NickPaintsConfig {
         return this.globalRenderingEnabled;
     }
 
-    public String baseUrl = "ws://localhost:3000";
+    public String baseUrl = "wss://2api.nickpaints.ru";
 
     public String apiKey = "20oymFVk6uOPmY0s6/XLiHgS--yF=LsQuJ0x/hgzOBCDZ8yvG-hvZyNBFttmodyj";
 
