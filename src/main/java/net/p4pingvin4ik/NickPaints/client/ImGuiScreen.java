@@ -15,6 +15,7 @@ import net.minecraft.text.Text;
 import net.p4pingvin4ik.NickPaints.client.imgui.RenderInterface;
 import net.p4pingvin4ik.NickPaints.config.ConfigManager;
 import net.p4pingvin4ik.NickPaints.util.GradientUtil;
+
 import org.lwjgl.glfw.GLFW;
 
 import java.awt.Color;
@@ -35,6 +36,7 @@ import java.util.stream.Collectors;
 public class ImGuiScreen extends Screen implements RenderInterface {
 
     // --- State Management for the Gradient Editor ---
+
     private final ImBoolean isRainbowMode = new ImBoolean(false);
     private final ImInt rainbowSpeed = new ImInt(3000);
     private final List<float[]> colors = new ArrayList<>();
@@ -43,8 +45,10 @@ public class ImGuiScreen extends Screen implements RenderInterface {
     private final ImBoolean isStatic = new ImBoolean(false);
     private final ImBoolean isBlockStyle = new ImBoolean(false);
     private final ImBoolean isRightToLeft = new ImBoolean(false);
+    private final ImInt angle = new ImInt(45);
 
     // --- State Management for the Settings Window ---
+
     private final ImString playerToDisableInput = new ImString(32);
     private int tutorialStep = 0;
     private boolean isTutorialActive = false;
@@ -54,7 +58,9 @@ public class ImGuiScreen extends Screen implements RenderInterface {
     private final float[] settingsPos = new float[2];
     private final float[] settingsSize = new float[2];
     private final float[] saveButtonPos = new float[2];
-    // A simple layout to use if the user has no .ini file yet.
+    /**
+     * A simple layout to use if the user has no .ini file yet.
+     */
     private static final String DEFAULT_LAYOUT = """
             [Window][Dockspace Host]
             Size=1920,1080
@@ -105,10 +111,20 @@ public class ImGuiScreen extends Screen implements RenderInterface {
                 DockNode      ID=0x00000006 Parent=0x00000008 SizeRef=350,1440 Selected=0x8FAD21AA
             """;
 
+    /**
+     * Constructs a new ImGuiScreen.
+     */
     public ImGuiScreen() {
         super(Text.literal("NickPaints ImGui Screen"));
     }
 
+    /**
+     * Renders the ImGui interface.
+     * This method is the main entry point for rendering the UI. It sets up the dockspace,
+     * renders the main configuration and settings windows, and handles the tutorial overlay.
+     *
+     * @param io The ImGuiIO object, which provides information about the input and output of ImGui.
+     */
     @Override
     public void gradientNickname$render(ImGuiIO io) {
         if (isFirstFrame) {
@@ -140,10 +156,27 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         }
         ImGui.end(); // End the Dockspace Host window
     }
+
+    /**
+     * Renders the background of the screen.
+     * In this case, we don't want to render the default Minecraft screen background,
+     * so this method is intentionally left empty.
+     *
+     * @param context The DrawContext for rendering.
+     * @param mouseX The x-coordinate of the mouse.
+     * @param mouseY The y-coordinate of the mouse.
+     * @param delta The time delta since the last frame.
+     */
     @Override
     public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Do nothing.
+        // Do nothing to keep the background clear for the ImGui interface.
     }
+
+    /**
+     * Renders the interactive tutorial.
+     * The tutorial guides the user through the main features of the UI.
+     * It displays a series of pop-ups and highlights different parts of the screen.
+     */
     private void renderTutorial() {
         ImGui.getBackgroundDrawList().addRectFilled(0, 0,
                 MinecraftClient.getInstance().getWindow().getFramebufferWidth(),
@@ -182,7 +215,6 @@ public class ImGuiScreen extends Screen implements RenderInterface {
                 break;
 
             case 2:
-
                 float step2X = settingsPos[0] - tutorialWidth - margin;
                 if (step2X < 0) {
                     step2X = settingsPos[0] + settingsSize[0] + margin;
@@ -201,6 +233,13 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         }
     }
 
+    /**
+     * Renders a single step of the tutorial.
+     *
+     * @param langKeyPrefix The prefix for the language keys to use for the tutorial step's title and content.
+     * @param x The x-coordinate of the tutorial window.
+     * @param y The y-coordinate of the tutorial window.
+     */
     private void renderTutorialStep(String langKeyPrefix, float x, float y) {
         ImGui.setNextWindowSize(300, 0, ImGuiCond.Appearing);
 
@@ -258,23 +297,40 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         mainConfigSize[0] = ImGui.getWindowSizeX();
         mainConfigSize[1] = ImGui.getWindowSizeY();
 
-        drawPreview();
+        drawPreview(reconstructGradientString(), true);
         ImGui.separator();
         ImGui.checkbox(Lang.get("gui.nickpaints.mode.rainbow"), isRainbowMode);
         ImGui.separator();
 
+        ImGui.pushItemWidth(-1);
         if (isRainbowMode.get()) {
             ImGui.text(Lang.get("gui.nickpaints.option.speed"));
             ImGui.sliderInt("##rainbowspeed", rainbowSpeed.getData(), 1000, 20000);
         } else {
             renderColorEditor();
-            renderOptions();
+            ImGui.text(Lang.get("gui.nickpaints.option.speed"));
+            if (isStatic.get()) ImGui.beginDisabled();
+            ImGui.sliderInt("##speed", speed.getData(), 1000, 20000);
+            if (isStatic.get()) ImGui.endDisabled();
+
+            ImGui.text(Lang.get("gui.nickpaints.option.segment"));
+            ImGui.sliderInt("##segment", segment.getData(), 1, 200);
+
+            ImGui.text(Lang.get("gui.nickpaints.option.angle"));
+            ImGui.sliderInt("##angle", angle.getData(), 0, 360);
+        }
+        ImGui.popItemWidth();
+        ImGui.separator();
+
+        if (!isRainbowMode.get()) {
+            ImGui.checkbox(Lang.get("gui.nickpaints.option.static"), isStatic);
+            ImGui.checkbox(Lang.get("gui.nickpaints.option.style_block"), isBlockStyle);
+            ImGui.separator();
         }
 
-        ImGui.separator();
         renderUtilities();
 
-        if (ImGui.button(Lang.get("gui.nickpaints.button.save_sync"))) {
+        if (ImGui.button(Lang.get("gui.nickpaints.button.save_sync"), -1, 0)) {
             ConfigManager.CONFIG.currentGradient = reconstructGradientString();
             ConfigManager.saveConfig();
             if (MinecraftClient.getInstance().player != null) {
@@ -284,13 +340,11 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         saveButtonPos[0] = ImGui.getItemRectMinX();
         saveButtonPos[1] = ImGui.getItemRectMinY();
 
-        ImGui.sameLine();
-        if (ImGui.button(Lang.get("gui.nickpaints.button.close"))) {
-            this.close();
-        }
-
+        ImGui.separator();
+        renderPresets();
         ImGui.end();
     }
+
 
     /**
      * Renders the settings window, containing functionality from the old commands.
@@ -298,10 +352,11 @@ public class ImGuiScreen extends Screen implements RenderInterface {
     private void renderSettingsWindow() {
         ImGui.begin(Lang.get("gui.nickpaints.settings.title") + "##Settings");
 
+        // Store the position of the window for the tutorial
         settingsPos[0] = ImGui.getWindowPosX();
         settingsPos[1] = ImGui.getWindowPosY();
 
-        // Global Toggle
+        // Global rendering toggle
         boolean globalEnabled = ConfigManager.CONFIG.globalRenderingEnabled;
         if (ImGui.checkbox("##globaltoggle", globalEnabled)) {
             ConfigManager.CONFIG.setGlobalRendering(!globalEnabled);
@@ -310,7 +365,7 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         ImGui.sameLine();
         ImGui.text(Lang.get("gui.nickpaints.settings.global_rendering"));
 
-        // Disable own nametag
+        // Toggle for showing own nametag
         boolean showOwnNametag = ConfigManager.CONFIG.showOwnNametag;
         if (ImGui.checkbox("##showownnametag", showOwnNametag)) {
             ConfigManager.CONFIG.showOwnNametag = !showOwnNametag;
@@ -321,7 +376,7 @@ public class ImGuiScreen extends Screen implements RenderInterface {
 
         ImGui.separator();
 
-        // Disable Player Section
+        // Section for disabling rendering for specific players
         ImGui.text(Lang.get("gui.nickpaints.settings.disable_player_label"));
         ImGui.inputText("##playerinput", playerToDisableInput);
         ImGui.sameLine();
@@ -341,7 +396,7 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         renderPlayerSuggestions();
 
 
-        // List of Disabled Players
+        // List of disabled players
         ImGui.text(Lang.get("gui.nickpaints.settings.disabled_list"));
         ImGui.beginChild("##disabledlist", 0, -ImGui.getFrameHeightWithSpacing() * 2, true);
         if (ConfigManager.CONFIG.disabledPlayers.isEmpty()) {
@@ -360,7 +415,7 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         }
         ImGui.endChild();
 
-        // Clear Cache Button
+        // Button to clear the cache
         if (ImGui.button(Lang.get("gui.nickpaints.settings.clear_cache_button"))) {
             WebSocketManager.clearCache();
         }
@@ -391,6 +446,7 @@ public class ImGuiScreen extends Screen implements RenderInterface {
                 .filter(name -> !ConfigManager.CONFIG.disabledPlayers.containsValue(name)) // Exclude already disabled players
                 .collect(Collectors.toList());
 
+        // Don't show suggestions if the only suggestion is the same as the input
         if (suggestions.size() == 1 && suggestions.get(0).equalsIgnoreCase(currentInput)) {
             return;
         }
@@ -406,19 +462,33 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         }
     }
 
-    private void drawPreview() {
+    /**
+     * Draws a preview of the gradient on the player's nickname.
+     *
+     * @param gradientString The gradient string to use for the preview.
+     * @param centered Whether to center the preview text.
+     */
+    private void drawPreview(String gradientString, boolean centered) {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null) return;
-        String currentGradient = reconstructGradientString();
+
         String playerName = client.player.getName().getString();
-        float textWidth = ImGui.calcTextSize(playerName).x;
-        float windowWidth = ImGui.getWindowWidth();
-        float startX = ImGui.getWindowPosX() + (windowWidth - textWidth) / 2.0f;
-        float startY = ImGui.getCursorScreenPos().y;
+
+        float startX;
+        float startY = ImGui.getCursorScreenPosY();
+
+        if (centered) {
+            float textWidth = ImGui.calcTextSize(playerName).x;
+            float windowWidth = ImGui.getWindowWidth();
+            startX = ImGui.getWindowPosX() + (windowWidth - textWidth) / 2.0f;
+        } else {
+            startX = ImGui.getCursorScreenPosX();
+        }
+
         float currentX = startX;
         for (int i = 0; i < playerName.length(); i++) {
             String characterStr = String.valueOf(playerName.charAt(i));
-            int argbColor = GradientUtil.getColor(currentGradient, i, playerName.length());
+            int argbColor = GradientUtil.getColor(gradientString, i, playerName.length());
             int a = (argbColor >> 24) & 0xFF;
             int r = (argbColor >> 16) & 0xFF;
             int g = (argbColor >> 8) & 0xFF;
@@ -427,9 +497,18 @@ public class ImGuiScreen extends Screen implements RenderInterface {
             ImGui.getWindowDrawList().addText(currentX, startY, abgrColor, characterStr);
             currentX += ImGui.calcTextSize(characterStr).x;
         }
-        ImGui.dummy(0, ImGui.getTextLineHeightWithSpacing());
+
+        if (centered) {
+            ImGui.dummy(0, ImGui.getTextLineHeightWithSpacing());
+        } else {
+            ImGui.dummy(currentX - startX, ImGui.getTextLineHeight());
+        }
     }
 
+    /**
+     * Renders the color editor for the custom gradient.
+     * This allows the user to add, remove, and edit the colors of the gradient.
+     */
     private void renderColorEditor() {
         ImGui.text(Lang.get("gui.nickpaints.section.colors"));
         int colorToRemove = -1;
@@ -448,6 +527,9 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         }
     }
 
+    /**
+     * Renders utility buttons, such as copy, paste, and the character count.
+     */
     private void renderUtilities() {
         if (ImGui.button(Lang.get("gui.nickpaints.button.copy"))) {
             ImGui.setClipboardText(reconstructGradientString());
@@ -475,26 +557,87 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         ImGui.textColored(r, g, b, 1.0f, valueText);
     }
 
-    private void renderOptions() {
-        ImGui.spacing(); ImGui.separator(); ImGui.text(Lang.get("gui.nickpaints.section.options"));
-        ImGui.checkbox(Lang.get("gui.nickpaints.option.static"), isStatic);
-        if (isStatic.get()) ImGui.beginDisabled();
-        ImGui.text(Lang.get("gui.nickpaints.option.speed"));
-        ImGui.sliderInt("##speed", speed.getData(), 1000, 20000);
-        if (isStatic.get()) ImGui.endDisabled();
-        ImGui.text(Lang.get("gui.nickpaints.option.segment"));
-        ImGui.sliderInt("##segment", segment.getData(), 1, 100);
-        ImGui.checkbox(Lang.get("gui.nickpaints.option.style_block"), isBlockStyle);
-        ImGui.sameLine();
-        ImGui.checkbox(Lang.get("gui.nickpaints.option.direction_rtl"), isRightToLeft);
+    /**
+     * Renders the presets section.
+     * This allows the user to save, apply, and delete gradient presets.
+     */
+    private void renderPresets() {
+        int presetToDelete = -1;
+        MinecraftClient client = MinecraftClient.getInstance();
+        String playerName = (client != null && client.player != null) ? client.player.getName().getString() : "Preview";
+        float previewWidth = ImGui.calcTextSize(playerName).x;
+
+        float buttonSize = ImGui.getTextLineHeightWithSpacing();
+
+        for (int i = 0; i < ConfigManager.CONFIG.presets.size(); i++) {
+            ImGui.pushID(i);
+
+            if (ImGui.button("+", buttonSize, buttonSize)) {
+                parseGradientString(ConfigManager.CONFIG.presets.get(i));
+            }
+            if (ImGui.isItemHovered()) {
+                ImGui.setTooltip(Lang.get("gui.nickpaints.tooltip.apply_preset"));
+            }
+
+            ImGui.sameLine();
+
+            float startX = ImGui.getCursorPosX();
+            float endX = ImGui.getWindowContentRegionMaxX() - buttonSize;
+            float availableSpace = endX - startX;
+            float previewStartX = startX + (availableSpace - previewWidth) / 2;
+
+            if (previewStartX > startX) {
+                ImGui.setCursorPosX(previewStartX);
+                drawPreview(ConfigManager.CONFIG.presets.get(i), false);
+            }
+
+            ImGui.sameLine();
+
+            ImGui.setCursorPosX(endX);
+
+            ImGui.pushStyleColor(ImGuiCol.Button, 0.7f, 0.2f, 0.2f, 1.0f);
+            ImGui.pushStyleColor(ImGuiCol.ButtonHovered, 0.9f, 0.3f, 0.3f, 1.0f);
+            ImGui.pushStyleColor(ImGuiCol.ButtonActive, 0.6f, 0.15f, 0.15f, 1.0f);
+            if (ImGui.button("-", buttonSize, buttonSize)) {
+                presetToDelete = i;
+            }
+            ImGui.popStyleColor(3);
+            if (ImGui.isItemHovered()) {
+                ImGui.setTooltip(Lang.get("gui.nickpaints.tooltip.delete_preset"));
+            }
+
+            ImGui.popID();
+        }
+
+        ImGui.separator();
+
+        if (ImGui.button(Lang.get("gui.nickpaints.button.save_preset"), -1, 0)) {
+            ConfigManager.CONFIG.presets.add(reconstructGradientString());
+            ConfigManager.saveConfig();
+        }
+
+        if (presetToDelete != -1) {
+            ConfigManager.CONFIG.presets.remove(presetToDelete);
+            ConfigManager.saveConfig();
+        }
     }
 
+    /**
+     * Parses a gradient string and updates the state of the UI accordingly.
+     *
+     * @param gradientString The gradient string to parse.
+     */
     private void parseGradientString(String gradientString) {
         if (gradientString == null || gradientString.isEmpty()) { colors.add(new float[]{1f,1f,1f}); return; }
         Matcher rainbowMatcher = Pattern.compile("rainbow\\((\\d+)\\)").matcher(gradientString);
         if (rainbowMatcher.matches()) { isRainbowMode.set(true); rainbowSpeed.set(Integer.parseInt(rainbowMatcher.group(1))); return; }
         isRainbowMode.set(false);
         String tempString = gradientString.toLowerCase();
+        Matcher angleMatcher = Pattern.compile("angle\\((\\d+)\\)").matcher(tempString);
+        if (angleMatcher.find()) {
+            angle.set(Integer.parseInt(angleMatcher.group(1)));
+            tempString = angleMatcher.replaceAll("");
+        }
         Matcher staticMatcher = Pattern.compile("static\\(true\\)").matcher(tempString);
         isStatic.set(staticMatcher.find());
         if (isStatic.get()) tempString = staticMatcher.replaceAll("");
@@ -520,6 +663,11 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         if (colors.isEmpty()) { colors.add(new float[]{1f,1f,1f}); }
     }
 
+    /**
+     * Reconstructs the gradient string from the current state of the UI.
+     *
+     * @return The reconstructed gradient string.
+     */
     private String reconstructGradientString() {
         if (isRainbowMode.get()) { return String.format("rainbow(%d)", rainbowSpeed.get()); }
         StringBuilder sb = new StringBuilder();
@@ -527,11 +675,17 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         sb.append(colorsString);
         if (isStatic.get()) { sb.append(" static(true)"); } else { sb.append(" speed(").append(speed.get()).append(")"); }
         sb.append(" segment(").append(segment.get()).append(")");
+        sb.append(" angle(").append(angle.get()).append(")");
         if (isBlockStyle.get()) { sb.append(" style(block)"); }
         if (isRightToLeft.get()) { sb.append(" direction(rtl)"); }
         return sb.toString().trim();
     }
 
+    /**
+     * Sets up the dockspace for the ImGui windows.
+     * This creates a main dockspace that covers the entire screen,
+     * allowing the user to dock the configuration and settings windows.
+     */
     private void setupDockspace() {
         int windowFlags = ImGuiWindowFlags.NoDocking | ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoCollapse |
                 ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoBringToFrontOnFocus |
@@ -550,10 +704,24 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         ImGui.popStyleColor();
     }
 
+    /**
+     * Determines whether the game should be paused when this screen is open.
+     *
+     * @return false, as we don't want to pause the game.
+     */
     @Override
     public boolean shouldPause() {
         return false;
     }
+
+    /**
+     * Handles key press events.
+     *
+     * @param keyCode The key code of the pressed key.
+     * @param scanCode The scan code of the pressed key.
+     * @param modifiers The modifier keys that were pressed.
+     * @return true if the event was handled, false otherwise.
+     */
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
@@ -561,6 +729,11 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
+
+    /**
+     * Called when the screen is removed.
+     * This is used to restore the cursor to its default state.
+     */
     @Override
     public void removed() {
         long windowHandle = MinecraftClient.getInstance().getWindow().getHandle();
