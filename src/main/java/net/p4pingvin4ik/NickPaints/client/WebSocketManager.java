@@ -41,6 +41,7 @@ public class WebSocketManager implements WebSocket.Listener {
     private static volatile boolean isAuthenticated = false;
     private static volatile boolean isConnecting = false;
     private static volatile boolean manuallyDisconnected = false;
+    private static volatile boolean authenticationPermanentlyFailed = false;
 
     private static ScheduledExecutorService scheduler;
     private static ScheduledFuture<?> queueProcessorTask;
@@ -52,6 +53,7 @@ public class WebSocketManager implements WebSocket.Listener {
 
     public static void connect() {
         manuallyDisconnected = false;
+        authenticationPermanentlyFailed = false;
         if (isAuthenticated || isConnecting || MinecraftClient.getInstance().getSession().getUuidOrNull() == null) {
             return;
         }
@@ -65,7 +67,7 @@ public class WebSocketManager implements WebSocket.Listener {
                     .buildAsync(URI.create(ConfigManager.CONFIG.baseUrl), INSTANCE)
                     .exceptionally(e -> {
                         isConnecting = false;
-                        if (reconnectAttempts < 1) {
+                        if (reconnectAttempts <= MAX_LOGGED_RECONNECT_ATTEMPTS) {
                             LOGGER.error("WebSocket connection failed to build: {}", e.getMessage());
                         }
                         handleDisconnection();
@@ -73,7 +75,9 @@ public class WebSocketManager implements WebSocket.Listener {
                     });
         } catch (Exception e) {
             isConnecting = false;
-            LOGGER.error("Failed to initiate WebSocket connection", e);
+            if (reconnectAttempts <= MAX_LOGGED_RECONNECT_ATTEMPTS) {
+                LOGGER.error("Failed to initiate WebSocket connection", e);
+            }
             handleDisconnection();
         }
     }
@@ -140,6 +144,8 @@ public class WebSocketManager implements WebSocket.Listener {
                         break;
                     case "auth_failure":
                         LOGGER.error("Authentication failed: {}", payloadElement.getAsJsonObject().get("error").getAsString());
+                        authenticationPermanentlyFailed = true;
+                        disconnect();
                         break;
                 }
             }
@@ -186,7 +192,7 @@ public class WebSocketManager implements WebSocket.Listener {
     }
     @Override
     public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
-        if (isAuthenticated) {
+        if (isAuthenticated && reconnectAttempts <= MAX_LOGGED_RECONNECT_ATTEMPTS) {
             LOGGER.warn("WebSocket closed unexpectedly: {} - {}", statusCode, reason);
         }
         isAuthenticated = false;
@@ -198,7 +204,7 @@ public class WebSocketManager implements WebSocket.Listener {
 
     @Override
     public void onError(WebSocket webSocket, Throwable error) {
-        if (reconnectAttempts < MAX_LOGGED_RECONNECT_ATTEMPTS) {
+        if (reconnectAttempts <= MAX_LOGGED_RECONNECT_ATTEMPTS) {
             LOGGER.error("WebSocket error occurred: {}", error.getMessage());
         }
         isAuthenticated = false;
@@ -207,7 +213,7 @@ public class WebSocketManager implements WebSocket.Listener {
         handleDisconnection();
     }
 
-    private void handleAuthChallenge(WebSocket ws, String authHash) throws AuthenticationException {
+    private void handleAuthChallenge(WebSocket ws, String authHash) {
         MinecraftClient client = MinecraftClient.getInstance();
         Session session = client.getSession();
 
@@ -223,11 +229,18 @@ public class WebSocketManager implements WebSocket.Listener {
             verifyPayload.addProperty("accessToken", session.getAccessToken());
         } else {
             LOGGER.info("In multiplayer mode, using session authentication...");
-            GameProfile gameProfile = new GameProfile(session.getUuidOrNull(), session.getUsername());
-            client.getSessionService().joinServer(gameProfile.getId(), session.getAccessToken(), authHash);
+            try {
+                GameProfile gameProfile = new GameProfile(session.getUuidOrNull(), session.getUsername());
+                client.getSessionService().joinServer(gameProfile.getId(), session.getAccessToken(), authHash);
 
-            verifyMessage.addProperty("type", "auth_verify_session");
-            verifyPayload.addProperty("username", session.getUsername());
+                verifyMessage.addProperty("type", "auth_verify_session");
+                verifyPayload.addProperty("username", session.getUsername());
+            } catch (AuthenticationException e) {
+                LOGGER.error("Session authentication failed. This can happen with a cracked client or invalid session. Disabling auto-reconnect.");
+                authenticationPermanentlyFailed = true;
+                disconnect();
+                return;
+            }
         }
 
         verifyMessage.add("payload", verifyPayload);
@@ -239,10 +252,10 @@ public class WebSocketManager implements WebSocket.Listener {
         String username = payload.get("username").getAsString();
         if (reconnectAttempts > 0) {
             LOGGER.info("Successfully authenticated with server after {} attempt(s). Welcome, {}!", reconnectAttempts, username);
-            reconnectAttempts = 0;
         } else {
             LOGGER.info("Authentication successful. Welcome, {}!", username);
         }
+        reconnectAttempts = 0;
         startQueueProcessor();
     }
 
@@ -276,14 +289,14 @@ public class WebSocketManager implements WebSocket.Listener {
     }
 
     private static void scheduleReconnect() {
-        if (isConnecting || manuallyDisconnected) {
+        if (isConnecting || manuallyDisconnected || authenticationPermanentlyFailed) {
             return;
         }
         isConnecting = true;
         reconnectAttempts++;
         long delay = 10;
         if (reconnectAttempts <= MAX_LOGGED_RECONNECT_ATTEMPTS) {
-            LOGGER.warn("Connection lost. Reconnecting in {} seconds... (Attempt {}/{})", delay, reconnectAttempts, MAX_LOGGED_RECONNECT_ATTEMPTS);
+            LOGGER.warn("Connection lost. Reconnecting...");
         } else if (reconnectAttempts == MAX_LOGGED_RECONNECT_ATTEMPTS + 1) {
             LOGGER.warn("Max logged reconnection attempts reached. Further attempts will be silent.");
         }
