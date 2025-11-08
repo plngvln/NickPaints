@@ -172,6 +172,72 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         // Do nothing to keep the background clear for the ImGui interface.
     }
 
+
+//    Not working rn
+//    /**
+//     * Override render to also render the preview using Minecraft's TextRenderer.
+//     * This uses the actual Minecraft rendering path with the mixin, ensuring perfect accuracy.
+//     * The preview is rendered at a fixed position that coordinates with ImGui window layout.
+//     */
+//    @Override
+//    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+//        // Render the preview using Minecraft's TextRenderer before ImGui renders on top
+//        // Position it where the ImGui preview window will be
+//        String currentGradient = reconstructGradientString();
+//        if (MinecraftClient.getInstance().player != null) {
+//            // Render preview at top center of screen - adjust as needed to match ImGui window
+//            int previewX = this.width / 2;
+//            int previewY = 50; // Adjust to match your ImGui window position
+//            drawPreviewWithMinecraftRenderer(context, currentGradient, previewX, previewY, true);
+//        }
+//
+//        // Call super to handle other rendering
+//        super.render(context, mouseX, mouseY, delta);
+//    }
+//
+//    /**
+//     * Renders the preview using Minecraft's TextRenderer for accurate gradient rendering.
+//     * This can be called from the Screen's render() method to use Minecraft's actual rendering.
+//     * Note: This requires rendering in Minecraft's context, not ImGui's context.
+//     *
+//     * @param context The DrawContext for rendering.
+//     * @param gradientString The gradient string to use.
+//     * @param x The x position to render at.
+//     * @param y The y position to render at.
+//     * @param centered Whether to center the text.
+//     */
+//    private void drawPreviewWithMinecraftRenderer(DrawContext context, String gradientString, int x, int y, boolean centered) {
+//        MinecraftClient client = MinecraftClient.getInstance();
+//        if (client.player == null) return;
+//
+//        String playerName = client.player.getName().getString();
+//        int totalLength = playerName.length();
+//        Text text = Text.literal(playerName);
+//
+//        // Set up the gradient data so the mixin can apply it
+//        try {
+//            if (totalLength > 0) {
+//                GradientData.CURRENT_GRADIENT.set(new GradientData(gradientString, totalLength));
+//            }
+//
+//            TextRenderer textRenderer = client.textRenderer;
+//
+//            // Calculate position
+//            int renderX = x;
+//            int renderY = y;
+//            if (centered) {
+//                int textWidth = textRenderer.getWidth(text);
+//                int windowWidth = this.width;
+//                renderX = (windowWidth - textWidth) / 2;
+//            }
+//
+//            // Render using Minecraft's TextRenderer - this will trigger the mixin and apply the gradient
+//            context.drawText(textRenderer, text, renderX, renderY, 0xFFFFFF, false);
+//        } finally {
+//            GradientData.CURRENT_GRADIENT.remove();
+//        }
+//    }
+
     /**
      * Renders the interactive tutorial.
      * The tutorial guides the user through the main features of the UI.
@@ -466,13 +532,14 @@ public class ImGuiScreen extends Screen implements RenderInterface {
      * Draws a preview of the gradient on the player's nickname.
      *
      * @param gradientString The gradient string to use for the preview.
-     * @param centered Whether to center the preview text.
+     * @param centered       Whether to center the preview text.
      */
     private void drawPreview(String gradientString, boolean centered) {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null) return;
 
         String playerName = client.player.getName().getString();
+        int totalLength = playerName.length();
 
         float startX;
         float startY = ImGui.getCursorScreenPosY();
@@ -485,17 +552,56 @@ public class ImGuiScreen extends Screen implements RenderInterface {
             startX = ImGui.getCursorScreenPosX();
         }
 
+        // Use Minecraft's font metrics for coordinate calculation
+        final float MC_CHAR_WIDTH = 8.0f;
+        final float MC_FONT_HEIGHT = 9.0f;
+        // Segments per character for a smooth gradient preview
+        final int HORIZONTAL_SEGMENTS = 4;
+        final int VERTICAL_SEGMENTS = 3;
+
         float currentX = startX;
+        float fontHeight = ImGui.getTextLineHeight();
+
+        // Iterate over each character
         for (int i = 0; i < playerName.length(); i++) {
             String characterStr = String.valueOf(playerName.charAt(i));
-            int argbColor = GradientUtil.getColor(gradientString, i, playerName.length());
-            int a = (argbColor >> 24) & 0xFF;
-            int r = (argbColor >> 16) & 0xFF;
-            int g = (argbColor >> 8) & 0xFF;
-            int b = argbColor & 0xFF;
-            int abgrColor = (a << 24) | (b << 16) | (g << 8) | r;
-            ImGui.getWindowDrawList().addText(currentX, startY, abgrColor, characterStr);
-            currentX += ImGui.calcTextSize(characterStr).x;
+            float charWidth = ImGui.calcTextSize(characterStr).x;
+
+            float segmentWidth = charWidth / HORIZONTAL_SEGMENTS;
+            float segmentHeight = fontHeight / VERTICAL_SEGMENTS;
+
+            // Render the character in a grid of segments
+            for (int vSeg = 0; vSeg < VERTICAL_SEGMENTS; vSeg++) {
+                for (int hSeg = 0; hSeg < HORIZONTAL_SEGMENTS; hSeg++) {
+                    // Calculate local coordinates for the center of the segment
+                    float localX = (i * MC_CHAR_WIDTH) + ((hSeg + 0.5f) / HORIZONTAL_SEGMENTS) * MC_CHAR_WIDTH;
+                    float localY = ((vSeg + 0.5f) / VERTICAL_SEGMENTS) * MC_FONT_HEIGHT;
+
+                    // Get the color for this specific point in the gradient
+                    int argbColor = GradientUtil.get2DColor(gradientString, totalLength, localX, localY);
+
+                    // Convert ARGB to ABGR for ImGui
+                    int a = (argbColor >> 24) & 0xFF;
+                    int r = (argbColor >> 16) & 0xFF;
+                    int g = (argbColor >> 8) & 0xFF;
+                    int b = argbColor & 0xFF;
+                    int abgrColor = (a << 24) | (b << 16) | (g << 8) | r;
+
+                    // Define the clipping rectangle for this grid cell
+                    float clipStartX = currentX + hSeg * segmentWidth;
+                    float clipStartY = startY + vSeg * segmentHeight;
+                    float clipEndX = clipStartX + segmentWidth;
+                    float clipEndY = clipStartY + segmentHeight;
+
+                    // Push clip rectangle, draw the character, and pop.
+                    // The character is drawn at its original position, but only the part
+                    // inside the clip rectangle is visible.
+                    ImGui.getWindowDrawList().pushClipRect(clipStartX, clipStartY, clipEndX, clipEndY, true);
+                    ImGui.getWindowDrawList().addText(currentX, startY, abgrColor, characterStr);
+                    ImGui.getWindowDrawList().popClipRect();
+                }
+            }
+            currentX += charWidth;
         }
 
         if (centered) {
