@@ -8,6 +8,8 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.session.Session;
 import net.minecraft.client.util.InputUtil;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.ClickEvent;
 import net.minecraft.text.HoverEvent;
 import net.minecraft.text.Text;
@@ -58,10 +60,11 @@ public class NickPaintsMod implements ClientModInitializer {
                     try {
                         Thread.sleep(1500);
                         if (client.player != null) {
+                            client.execute(() -> {
+                                client.player.playSound(SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME);
+                            });
                             client.player.sendMessage(createWelcomeMessage(), false);
                         }
-                        ConfigManager.CONFIG.hasShownWelcomeMessage = true;
-                        ConfigManager.saveConfig();
                     } catch (InterruptedException e) {
                         LOGGER.error("Failed to send NickPaints welcome message", e);
                     }
@@ -70,6 +73,7 @@ public class NickPaintsMod implements ClientModInitializer {
         });
         LOGGER.info("NickPaints Mod initialized.");
     }
+
     private Text createWelcomeMessage() {
         return Text.literal("[NickPaints] ").formatted(Formatting.AQUA)
                 .append(Text.translatable("chat.nickpaints.welcome.main").formatted(Formatting.WHITE))
