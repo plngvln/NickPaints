@@ -32,7 +32,7 @@ import static org.lwjgl.opengl.GL11C.*;
 public class ImGuiImpl {
     private final static ImGuiImplGlfw imGuiImplGlfw = new ImGuiImplGlfw();
     private final static ImGuiImplGl3 imGuiImplGl3 = new ImGuiImplGl3();
-    private static final float FONT_SIZE_PIXELS = 20.0f;
+    private static final float FONT_SIZE_PIXELS = 30.0f;
     private static int gFontTexture = -1;
     private static boolean isImGuiInitialized = false;
     private static boolean areBackendsInitialized = false;
