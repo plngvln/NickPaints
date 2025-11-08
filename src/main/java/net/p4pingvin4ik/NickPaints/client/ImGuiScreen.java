@@ -46,7 +46,6 @@ public class ImGuiScreen extends Screen implements RenderInterface {
     private final ImInt segment = new ImInt(16);
     private final ImBoolean isStatic = new ImBoolean(false);
     private final ImBoolean isBlockStyle = new ImBoolean(false);
-    private final ImBoolean isRightToLeft = new ImBoolean(false);
     private final ImInt angle = new ImInt(45);
 
     // --- State Management for the Settings Window ---
@@ -781,9 +780,6 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         Matcher styleMatcher = Pattern.compile("style\\((block)\\)").matcher(tempString);
         isBlockStyle.set(styleMatcher.find());
         if (isBlockStyle.get()) tempString = styleMatcher.replaceAll("");
-        Matcher directionMatcher = Pattern.compile("direction\\((rtl|ltr)\\)").matcher(tempString);
-        isRightToLeft.set(directionMatcher.find() && "rtl".equals(directionMatcher.group(1)));
-        if (isRightToLeft.get()) tempString = directionMatcher.replaceAll("");
         colors.clear();
         String[] hexCodes = tempString.trim().split(",");
         for (String hex : hexCodes) {
@@ -810,7 +806,6 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         sb.append(" segment(").append(segment.get()).append(")");
         sb.append(" angle(").append(angle.get()).append(")");
         if (isBlockStyle.get()) { sb.append(" style(block)"); }
-        if (isRightToLeft.get()) { sb.append(" direction(rtl)"); }
         return sb.toString().trim();
     }
 

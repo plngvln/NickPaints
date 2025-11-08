@@ -17,7 +17,6 @@ public class GradientUtil {
     private static final Pattern SEGMENT_PATTERN = Pattern.compile("segment\\((\\d+)\\)");
     private static final Pattern STATIC_PATTERN = Pattern.compile("static\\(true\\)");
     private static final Pattern STYLE_PATTERN = Pattern.compile("style\\((block)\\)");
-    private static final Pattern DIRECTION_PATTERN = Pattern.compile("direction\\((rtl|ltr)\\)");
     private static final long MIN_ANIMATION_SPEED = 1000L;
 
     /**
@@ -27,14 +26,13 @@ public class GradientUtil {
      * @param segmentLength          The length of the gradient segment.
      * @param isStatic               Whether the gradient is static (non-animated).
      * @param isBlockStyle           Whether the gradient has a block style.
-     * @param isRightToLeft          Whether the gradient flows from right to left.
      * @param angle                  The angle of the gradient in degrees.
      * @param isSegmentUserDefined   Whether the segment length was defined by the user.
      * @param colors                 The list of colors to be used in the gradient.
      */
     public record GradientOptions(
             long speed, float segmentLength, boolean isStatic,
-            boolean isBlockStyle, boolean isRightToLeft, float angle,
+            boolean isBlockStyle, float angle,
             boolean isSegmentUserDefined,
             List<Color> colors
     ) {}
@@ -89,9 +87,6 @@ public class GradientUtil {
         if (progress < 0) {
             progress += 1.0f;
         }
-        if (options.isRightToLeft()) {
-            progress = 1.0f - progress;
-        }
 
         return options.isBlockStyle()
                 ? getBlockColor(options.colors(), progress)
@@ -113,9 +108,8 @@ public class GradientUtil {
         GradientOptions options = parseOptions(gradientString, totalChars);
         if (options.colors().isEmpty()) return Color.WHITE.getRGB();
         if (options.colors().size() == 1) return options.colors().get(0).getRGB();
-        float effectiveCharIndex = options.isRightToLeft() ? (totalChars - 1 - charIndex) : charIndex;
         float timeOffset = options.isStatic() ? 0 : (float) (System.currentTimeMillis() % options.speed()) / options.speed();
-        float progress = (effectiveCharIndex / options.segmentLength() + timeOffset) % 1.0f;
+        float progress = (charIndex / options.segmentLength() + timeOffset) % 1.0f;
         if (progress < 0) progress += 1.0f;
         return options.isBlockStyle() ? getBlockColor(options.colors(), progress) : blendColors(options.colors(), progress);
     }
@@ -132,7 +126,7 @@ public class GradientUtil {
         final float AVG_CHAR_WIDTH = 8.0f;
 
         long speed = 4000L;
-        boolean isStatic = false, isBlockStyle = false, isRightToLeft = false;
+        boolean isStatic = false, isBlockStyle = false;
         boolean isSegmentUserDefined = false;
         float angle = 45.0f;
         String cleanGradientString = gradientString;
@@ -163,11 +157,6 @@ public class GradientUtil {
             if ("block".equals(styleMatcher.group(1))) isBlockStyle = true;
             cleanGradientString = styleMatcher.replaceAll("").trim();
         }
-        Matcher directionMatcher = DIRECTION_PATTERN.matcher(cleanGradientString.toLowerCase());
-        if (directionMatcher.find()) {
-            if ("rtl".equals(directionMatcher.group(1))) isRightToLeft = true;
-            cleanGradientString = directionMatcher.replaceAll("").trim();
-        }
 
         float segmentLength;
         Matcher segmentMatcher = SEGMENT_PATTERN.matcher(cleanGradientString.toLowerCase());
@@ -188,7 +177,7 @@ public class GradientUtil {
         if (segmentLength < 1.0f) segmentLength = 1.0f;
 
         List<Color> colors = parseHexColors(cleanGradientString);
-        return new GradientOptions(speed, segmentLength, isStatic, isBlockStyle, isRightToLeft, angle, isSegmentUserDefined, colors);
+        return new GradientOptions(speed, segmentLength, isStatic, isBlockStyle, angle, isSegmentUserDefined, colors);
     }
 
     private static int get2DRainbowColor(GradientOptions options, float localX, float localY) {
