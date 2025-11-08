@@ -8,6 +8,7 @@ import imgui.type.ImBoolean;
 import imgui.type.ImInt;
 import imgui.type.ImString;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gl.SimpleFramebuffer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.network.PlayerListEntry;
@@ -35,6 +36,7 @@ import java.util.stream.Collectors;
  */
 public class ImGuiScreen extends Screen implements RenderInterface {
 
+    private SimpleFramebuffer priviewFreamebuffer;
     // --- State Management for the Gradient Editor ---
 
     private final ImBoolean isRainbowMode = new ImBoolean(false);
@@ -530,6 +532,8 @@ public class ImGuiScreen extends Screen implements RenderInterface {
 
     /**
      * Draws a preview of the gradient on the player's nickname.
+     * This version is corrected to render a simpler, per-character vertical gradient
+     * to more accurately reflect Minecraft's rendering capabilities and to fix graphical artifacts.
      *
      * @param gradientString The gradient string to use for the preview.
      * @param centered       Whether to center the preview text.
@@ -555,9 +559,7 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         // Use Minecraft's font metrics for coordinate calculation
         final float MC_CHAR_WIDTH = 8.0f;
         final float MC_FONT_HEIGHT = 9.0f;
-        // Segments per character for a smooth gradient preview
-        final int HORIZONTAL_SEGMENTS = 4;
-        final int VERTICAL_SEGMENTS = 3;
+        final int VERTICAL_SEGMENTS = 8;
 
         float currentX = startX;
         float fontHeight = ImGui.getTextLineHeight();
@@ -567,39 +569,37 @@ public class ImGuiScreen extends Screen implements RenderInterface {
             String characterStr = String.valueOf(playerName.charAt(i));
             float charWidth = ImGui.calcTextSize(characterStr).x;
 
-            float segmentWidth = charWidth / HORIZONTAL_SEGMENTS;
+            // Determine the start (top) and end (bottom) colors for this character's vertical gradient
+            float characterCenterX = (i + 0.5f) * MC_CHAR_WIDTH;
+            int topArgbColor = GradientUtil.get2DColor(gradientString, totalLength, characterCenterX, 0);
+            int bottomArgbColor = GradientUtil.get2DColor(gradientString, totalLength, characterCenterX, MC_FONT_HEIGHT);
+
             float segmentHeight = fontHeight / VERTICAL_SEGMENTS;
 
-            // Render the character in a grid of segments
+            // Render the character in vertical slices, each with an interpolated color
             for (int vSeg = 0; vSeg < VERTICAL_SEGMENTS; vSeg++) {
-                for (int hSeg = 0; hSeg < HORIZONTAL_SEGMENTS; hSeg++) {
-                    // Calculate local coordinates for the center of the segment
-                    float localX = (i * MC_CHAR_WIDTH) + ((hSeg + 0.5f) / HORIZONTAL_SEGMENTS) * MC_CHAR_WIDTH;
-                    float localY = ((vSeg + 0.5f) / VERTICAL_SEGMENTS) * MC_FONT_HEIGHT;
+                // Interpolate the color for the current vertical segment
+                // The 't' value represents the progress down the character (0.0 at top, 1.0 at bottom)
+                float t = (vSeg + 0.5f) / VERTICAL_SEGMENTS;
+                int interpolatedArgb = interpolateColor(topArgbColor, bottomArgbColor, t);
 
-                    // Get the color for this specific point in the gradient
-                    int argbColor = GradientUtil.get2DColor(gradientString, totalLength, localX, localY);
+                // Convert ARGB to ABGR for ImGui
+                int a = (interpolatedArgb >> 24) & 0xFF;
+                int r = (interpolatedArgb >> 16) & 0xFF;
+                int g = (interpolatedArgb >> 8) & 0xFF;
+                int b = interpolatedArgb & 0xFF;
+                int abgrColor = (a << 24) | (b << 16) | (g << 8) | r;
 
-                    // Convert ARGB to ABGR for ImGui
-                    int a = (argbColor >> 24) & 0xFF;
-                    int r = (argbColor >> 16) & 0xFF;
-                    int g = (argbColor >> 8) & 0xFF;
-                    int b = argbColor & 0xFF;
-                    int abgrColor = (a << 24) | (b << 16) | (g << 8) | r;
+                // Define the clipping rectangle for this vertical slice
+                float clipStartX = currentX;
+                float clipStartY = startY + vSeg * segmentHeight;
+                float clipEndX = clipStartX + charWidth + 1.0f;
+                float clipEndY = clipStartY + segmentHeight + 1.0f;
 
-                    // Define the clipping rectangle for this grid cell
-                    float clipStartX = currentX + hSeg * segmentWidth;
-                    float clipStartY = startY + vSeg * segmentHeight;
-                    float clipEndX = clipStartX + segmentWidth;
-                    float clipEndY = clipStartY + segmentHeight;
-
-                    // Push clip rectangle, draw the character, and pop.
-                    // The character is drawn at its original position, but only the part
-                    // inside the clip rectangle is visible.
-                    ImGui.getWindowDrawList().pushClipRect(clipStartX, clipStartY, clipEndX, clipEndY, true);
-                    ImGui.getWindowDrawList().addText(currentX, startY, abgrColor, characterStr);
-                    ImGui.getWindowDrawList().popClipRect();
-                }
+                // Push clip rectangle, draw the character with the interpolated color, and pop.
+                ImGui.getWindowDrawList().pushClipRect(clipStartX, clipStartY, clipEndX, clipEndY, true);
+                ImGui.getWindowDrawList().addText(currentX, startY, abgrColor, characterStr);
+                ImGui.getWindowDrawList().popClipRect();
             }
             currentX += charWidth;
         }
@@ -609,6 +609,33 @@ public class ImGuiScreen extends Screen implements RenderInterface {
         } else {
             ImGui.dummy(currentX - startX, ImGui.getTextLineHeight());
         }
+    }
+
+    /**
+     * Linearly interpolates between two ARGB colors.
+     *
+     * @param color1 The starting color.
+     * @param color2 The ending color.
+     * @param t      The interpolation factor, from 0.0 to 1.0.
+     * @return The interpolated ARGB color.
+     */
+    private int interpolateColor(int color1, int color2, float t) {
+        int a1 = (color1 >> 24) & 0xFF;
+        int r1 = (color1 >> 16) & 0xFF;
+        int g1 = (color1 >> 8) & 0xFF;
+        int b1 = color1 & 0xFF;
+
+        int a2 = (color2 >> 24) & 0xFF;
+        int r2 = (color2 >> 16) & 0xFF;
+        int g2 = (color2 >> 8) & 0xFF;
+        int b2 = color2 & 0xFF;
+
+        int a = (int) (a1 + (a2 - a1) * t);
+        int r = (int) (r1 + (r2 - r1) * t);
+        int g = (int) (g1 + (g2 - g1) * t);
+        int b = (int) (b1 + (b2 - b1) * t);
+
+        return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
     /**
