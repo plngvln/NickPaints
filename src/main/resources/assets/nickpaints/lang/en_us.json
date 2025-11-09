@@ -46,6 +46,7 @@
   "gui.nickpaints.tutorial.button.start": "Start Tour",
   "gui.nickpaints.tutorial.button.next": "Next",
   "gui.nickpaints.tutorial.button.finish": "Finish",
+  "gui.nickpaints.tutorial.button.skip": "Skip",
   "gui.nickpaints.tutorial.step1.title": "1. Main Configuration Window",
   "gui.nickpaints.tutorial.step1.content": "This is where you create your gradient!\n\n- Preview: See your nickname live.\n- Colors: Add, remove, and pick colors for the gradient.\n- Options: Control animation speed, style, and direction.",
   "gui.nickpaints.tutorial.step2.title": "2. Settings Window",

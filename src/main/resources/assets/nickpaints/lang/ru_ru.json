@@ -46,6 +46,7 @@
   "gui.nickpaints.tutorial.button.start": "Начать тур",
   "gui.nickpaints.tutorial.button.next": "Далее",
   "gui.nickpaints.tutorial.button.finish": "Завершить",
+  "gui.nickpaints.tutorial.button.skip": "Пропустить",
   "gui.nickpaints.tutorial.step1.title": "1. Главное окно конфигурации",
   "gui.nickpaints.tutorial.step1.content": "Здесь вы создаете свой градиент!\n\n- Предпросмотр: Ваш ник с градиентом в реальном времени.\n- Цвета: Добавляйте, удаляйте и выбирайте цвета.\n- Опции: Управляйте скоростью анимации, стилем и направлением.",
   "gui.nickpaints.tutorial.step2.title": "2. Окно настроек",
