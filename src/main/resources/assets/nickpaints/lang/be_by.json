@@ -42,6 +42,7 @@
   "gui.nickpaints.tutorial.button.start": "Пачаць тур",
   "gui.nickpaints.tutorial.button.next": "Далей",
   "gui.nickpaints.tutorial.button.finish": "Скончыць",
+  "gui.nickpaints.tutorial.button.skip": "прапусціць",
   "gui.nickpaints.tutorial.step1.title": "1. Галоўнае акно канфігурацыі",
   "gui.nickpaints.tutorial.step1.content": "Тут ты ствараеш свой градыент!\n\n- Папярэдні прагляд: бачны твай нэймтаг у рэжыме рэальнага часу.\n- Колеры: дадавай, выдаляй і выбірай колеры.\n- Параметры: кантроль хуткасці, стылю і напрамку.",
   "gui.nickpaints.tutorial.step2.title": "2. Акно налад",
@@ -49,3 +50,4 @@
   "gui.nickpaints.tutorial.step3.title": "3. Захаванне і сінхранізацыя",
   "gui.nickpaints.tutorial.step3.content": "Гэта самая важная кнопка!\n\nНацісні 'Захаваць і сінхранізаваць', каб прымяніць змены і зрабіць іх бачным для іншых."
 }
+
