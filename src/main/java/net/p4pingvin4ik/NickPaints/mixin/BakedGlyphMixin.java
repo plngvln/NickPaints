@@ -3,6 +3,7 @@ package net.p4pingvin4ik.NickPaints.mixin;
 import net.minecraft.client.font.BakedGlyph;
 import net.minecraft.client.render.VertexConsumer;
 import net.p4pingvin4ik.NickPaints.client.GradientCache;
+import net.p4pingvin4ik.NickPaints.client.NickPaintsMod;
 import net.p4pingvin4ik.NickPaints.util.GradientData;
 import net.p4pingvin4ik.NickPaints.util.GradientUtil;
 import org.joml.Matrix4f;
@@ -47,6 +48,10 @@ public abstract class BakedGlyphMixin {
     private void drawWithPixelGradient(BakedGlyph.DrawnGlyph glyph, Matrix4f matrix, VertexConsumer vertexConsumer, int light, boolean fixedZ, CallbackInfo ci) {
         GradientData gradientData = GradientData.CURRENT_GRADIENT.get();
         if (gradientData == null) {
+            return;
+        }
+
+        if (NickPaintsMod.PROTECTED_TAG_INSERTION_KEY.equals(glyph.style().getInsertion())) {
             return;
         }
 

@@ -44,8 +44,7 @@ public abstract class EntityRendererMixin<T extends Entity, S extends EntityRend
                 }
             }
         }
-
-        if (paintToShow != null) {
+        if (paintToShow != null && !paintToShow.trim().isEmpty()) {
             try {
                 int totalLength = calculatePaintableLength(text);
                 if (totalLength > 0) {
