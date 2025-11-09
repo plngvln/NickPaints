@@ -201,6 +201,13 @@ public class ImGuiScreen extends Screen implements RenderInterface {
                     if (ImGui.button(Lang.get("gui.nickpaints.tutorial.button.start"))) {
                         tutorialStep++;
                     }
+                    ImGui.sameLine();
+                    if (ImGui.button(Lang.get("gui.nickpaints.tutorial.button.skip"))) {
+                        ConfigManager.CONFIG.hasCompletedGuiTutorial = true;
+                        ConfigManager.CONFIG.hasShownWelcomeMessage = true;
+                        ConfigManager.saveConfig();
+                        isTutorialActive = false;
+                    }
                     ImGui.end();
                 }
                 break;
