@@ -3,6 +3,7 @@ package net.p4pingvin4ik.NickPaints.util;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -37,6 +38,11 @@ public class GradientUtil {
             List<Color> colors
     ) {}
 
+    /** Normalizes a value to [0, 1) despite negative operands from Java's remainder operator. */
+    private static float normalizeProgress(float value) {
+        return (value % 1.0f + 1.0f) % 1.0f;
+    }
+
     /**
      * Calculates the color for a 2D gradient at a specific point.
      *
@@ -51,9 +57,10 @@ public class GradientUtil {
             return Color.WHITE.getRGB();
         }
 
+        String normalizedGradient = gradientString.trim().toLowerCase(Locale.ROOT);
         GradientOptions options = parseOptions(gradientString, totalLength);
 
-        if (RAINBOW_PATTERN.matcher(gradientString.toLowerCase().trim()).matches()) {
+        if (RAINBOW_PATTERN.matcher(normalizedGradient).matches()) {
             return get2DRainbowColor(options, localX, localY);
         }
 
@@ -65,12 +72,13 @@ public class GradientUtil {
         float sin = (float) Math.sin(angleRad);
 
         float projectedPosition = localX * cos + localY * sin;
-        float timeOffset = options.isStatic() ? 0 : (float) (System.currentTimeMillis() % options.speed()) / options.speed();
+        long speed = options.speed();
+        float timeOffset = options.isStatic() ? 0 : (float) (System.currentTimeMillis() % speed) / speed;
 
         float progress;
 
         if (options.isSegmentUserDefined()) {
-            progress = (projectedPosition / options.segmentLength() + timeOffset) % 1.0f;
+            progress = normalizeProgress(projectedPosition / options.segmentLength() + timeOffset);
         } else {
             float textWidth = totalLength * 8.0f;
             float fontHeight = 9.0f;
@@ -80,12 +88,7 @@ public class GradientUtil {
             if (sin < 0) minProjected += fontHeight * sin;
 
             float normalizedPosition = projectedPosition - minProjected;
-            progress = (normalizedPosition / options.segmentLength() + timeOffset) % 1.0f;
-        }
-
-
-        if (progress < 0) {
-            progress += 1.0f;
+            progress = normalizeProgress(normalizedPosition / options.segmentLength() + timeOffset);
         }
 
         return options.isBlockStyle()
@@ -103,14 +106,14 @@ public class GradientUtil {
      */
     public static int getColor(String gradientString, int charIndex, int totalChars) {
         if (totalChars <= 0 || gradientString == null || gradientString.trim().isEmpty()) return Color.WHITE.getRGB();
-        if (RAINBOW_PATTERN.matcher(gradientString.toLowerCase().trim()).matches())
+        if (RAINBOW_PATTERN.matcher(gradientString.trim().toLowerCase(Locale.ROOT)).matches())
             return getRainbowColor(gradientString, charIndex, totalChars);
         GradientOptions options = parseOptions(gradientString, totalChars);
         if (options.colors().isEmpty()) return Color.WHITE.getRGB();
         if (options.colors().size() == 1) return options.colors().get(0).getRGB();
-        float timeOffset = options.isStatic() ? 0 : (float) (System.currentTimeMillis() % options.speed()) / options.speed();
-        float progress = (charIndex / options.segmentLength() + timeOffset) % 1.0f;
-        if (progress < 0) progress += 1.0f;
+        long speed = options.speed();
+        float timeOffset = options.isStatic() ? 0 : (float) (System.currentTimeMillis() % speed) / speed;
+        float progress = normalizeProgress(charIndex / options.segmentLength() + timeOffset);
         return options.isBlockStyle() ? getBlockColor(options.colors(), progress) : blendColors(options.colors(), progress);
     }
 
@@ -130,36 +133,41 @@ public class GradientUtil {
         boolean isSegmentUserDefined = false;
         float angle = 45.0f;
         String cleanGradientString = gradientString;
+        String modLower = cleanGradientString.toLowerCase(Locale.ROOT);
 
-        Matcher angleMatcher = ANGLE_PATTERN.matcher(cleanGradientString.toLowerCase());
+        Matcher angleMatcher = ANGLE_PATTERN.matcher(modLower);
         if (angleMatcher.find()) {
             try {
                 angle = Float.parseFloat(angleMatcher.group(1));
             } catch (NumberFormatException ignored) {
             }
             cleanGradientString = angleMatcher.replaceAll("").trim();
+            modLower = cleanGradientString.toLowerCase(Locale.ROOT);
         }
-        Matcher staticMatcher = STATIC_PATTERN.matcher(cleanGradientString.toLowerCase());
+        Matcher staticMatcher = STATIC_PATTERN.matcher(modLower);
         if (staticMatcher.find()) {
             isStatic = true;
             cleanGradientString = staticMatcher.replaceAll("").trim();
+            modLower = cleanGradientString.toLowerCase(Locale.ROOT);
         }
-        Matcher speedMatcher = SPEED_PATTERN.matcher(cleanGradientString.toLowerCase());
+        Matcher speedMatcher = SPEED_PATTERN.matcher(modLower);
         if (speedMatcher.find()) {
             try {
                 speed = Math.max(MIN_ANIMATION_SPEED, Long.parseLong(speedMatcher.group(1)));
             } catch (NumberFormatException ignored) {
             }
             cleanGradientString = speedMatcher.replaceAll("").trim();
+            modLower = cleanGradientString.toLowerCase(Locale.ROOT);
         }
-        Matcher styleMatcher = STYLE_PATTERN.matcher(cleanGradientString.toLowerCase());
+        Matcher styleMatcher = STYLE_PATTERN.matcher(modLower);
         if (styleMatcher.find()) {
             if ("block".equals(styleMatcher.group(1))) isBlockStyle = true;
             cleanGradientString = styleMatcher.replaceAll("").trim();
+            modLower = cleanGradientString.toLowerCase(Locale.ROOT);
         }
 
         float segmentLength;
-        Matcher segmentMatcher = SEGMENT_PATTERN.matcher(cleanGradientString.toLowerCase());
+        Matcher segmentMatcher = SEGMENT_PATTERN.matcher(modLower);
         if (segmentMatcher.find()) {
             isSegmentUserDefined = true;
             try {
@@ -185,9 +193,10 @@ public class GradientUtil {
         float cos = (float) Math.cos(angleRad);
         float sin = (float) Math.sin(angleRad);
         float projectedPosition = localX * cos + localY * sin;
-        float timeOffset = (float) (System.currentTimeMillis() % options.speed()) / options.speed();
-        float hue = timeOffset - projectedPosition * 0.1f;
-        return Color.HSBtoRGB(hue % 1.0f, 0.8f, 1.0f);
+        long speed = options.speed();
+        float timeOffset = (float) (System.currentTimeMillis() % speed) / speed;
+        float hue = normalizeProgress(timeOffset - projectedPosition * 0.1f);
+        return Color.HSBtoRGB(hue, 0.8f, 1.0f);
     }
 
     private static List<Color> parseHexColors(String hexString) {
@@ -205,14 +214,14 @@ public class GradientUtil {
     }
 
     private static int getRainbowColor(String gradientString, int charIndex, int totalChars) {
-        Matcher rainbowMatcher = RAINBOW_PATTERN.matcher(gradientString.toLowerCase().trim());
+        Matcher rainbowMatcher = RAINBOW_PATTERN.matcher(gradientString.trim().toLowerCase(Locale.ROOT));
         if (!rainbowMatcher.matches()) return Color.WHITE.getRGB();
         long speed = 3000L;
         try {
             speed = Math.max(MIN_ANIMATION_SPEED, Long.parseLong(rainbowMatcher.group(1)));
         } catch (NumberFormatException ignored) {
         }
-        float hue = (float) (System.currentTimeMillis() % speed) / speed - (float) charIndex / totalChars * 0.5f;
+        float hue = normalizeProgress((float) (System.currentTimeMillis() % speed) / speed - (float) charIndex / totalChars * 0.5f);
         return Color.HSBtoRGB(hue, 0.8f, 1.0f);
     }
 

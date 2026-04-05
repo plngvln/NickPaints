@@ -51,6 +51,8 @@ public class WebSocketManager implements WebSocket.Listener {
     private static final Set<UUID> lastVisiblePlayers = new CopyOnWriteArraySet<>();
     private static int tickCounter = 0;
 
+    private static final Object reconnectLock = new Object();
+
     public static void connect() {
         manuallyDisconnected = false;
         authenticationPermanentlyFailed = false;
@@ -86,6 +88,7 @@ public class WebSocketManager implements WebSocket.Listener {
         manuallyDisconnected = true;
         isAuthenticated = false;
         isConnecting = false;
+        reconnectAttempts = 0;
         if (webSocket != null && !webSocket.isOutputClosed()) {
             webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "Client shutting down");
             webSocket = null;
@@ -105,7 +108,13 @@ public class WebSocketManager implements WebSocket.Listener {
     @Override
     public CompletionStage<?> onText(WebSocket ws, CharSequence data, boolean last) {
         try {
-            JsonElement parsedElement = JsonParser.parseString(data.toString());
+            String raw = data != null ? data.toString() : "";
+            if (raw.trim().isEmpty()) {
+                LOGGER.warn("Received empty WebSocket message");
+                ws.request(1);
+                return null;
+            }
+            JsonElement parsedElement = JsonParser.parseString(raw);
             if (!parsedElement.isJsonObject()) {
                 LOGGER.warn("Received non-JSON-object message: {}", data);
                 ws.request(1);
@@ -133,6 +142,9 @@ public class WebSocketManager implements WebSocket.Listener {
                     case "playerLeft":
                         handlePlayerLeft(payloadElement.getAsJsonObject());
                         break;
+                    default:
+                        LOGGER.warn("Unknown authenticated message type: {}", type);
+                        break;
                 }
             } else {
                 switch (type) {
@@ -147,10 +159,13 @@ public class WebSocketManager implements WebSocket.Listener {
                         authenticationPermanentlyFailed = true;
                         disconnect();
                         break;
+                    default:
+                        LOGGER.warn("Unknown pre-auth message type: {}", type);
+                        break;
                 }
             }
         } catch (Exception e) {
-            LOGGER.error("Failed to process WebSocket message: {}", data.toString(), e);
+            LOGGER.error("Failed to process WebSocket message: {}", data != null ? data.toString() : "(null)", e);
         }
         ws.request(1);
         return null;
@@ -167,8 +182,12 @@ public class WebSocketManager implements WebSocket.Listener {
         tickCounter = 0;
 
         MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null) {
+            return;
+        }
+        final UUID selfUuid = client.player.getUuid();
         Set<UUID> currentlyVisiblePlayers = client.world.getPlayers().stream()
-                .filter(player -> !player.getUuid().equals(client.player.getUuid()))
+                .filter(player -> !player.getUuid().equals(selfUuid))
                 .map(player -> player.getUuid())
                 .collect(Collectors.toSet());
 
@@ -289,19 +308,23 @@ public class WebSocketManager implements WebSocket.Listener {
     }
 
     private static void scheduleReconnect() {
-        if (isConnecting || manuallyDisconnected || authenticationPermanentlyFailed) {
-            return;
+        final long delaySeconds = 10;
+        synchronized (reconnectLock) {
+            if (isConnecting || manuallyDisconnected || authenticationPermanentlyFailed) {
+                return;
+            }
+            isConnecting = true;
+            reconnectAttempts++;
+            if (reconnectAttempts <= MAX_LOGGED_RECONNECT_ATTEMPTS) {
+                LOGGER.warn("Connection lost. Reconnecting...");
+            } else if (reconnectAttempts == MAX_LOGGED_RECONNECT_ATTEMPTS + 1) {
+                LOGGER.warn("Max logged reconnection attempts reached. Further attempts will be silent.");
+            }
         }
-        isConnecting = true;
-        reconnectAttempts++;
-        long delay = 10;
-        if (reconnectAttempts <= MAX_LOGGED_RECONNECT_ATTEMPTS) {
-            LOGGER.warn("Connection lost. Reconnecting...");
-        } else if (reconnectAttempts == MAX_LOGGED_RECONNECT_ATTEMPTS + 1) {
-            LOGGER.warn("Max logged reconnection attempts reached. Further attempts will be silent.");
-        }
-        CompletableFuture.delayedExecutor(delay, TimeUnit.SECONDS).execute(() -> {
-            isConnecting = false;
+        CompletableFuture.delayedExecutor(delaySeconds, TimeUnit.SECONDS).execute(() -> {
+            synchronized (reconnectLock) {
+                isConnecting = false;
+            }
             connect();
         });
     }
