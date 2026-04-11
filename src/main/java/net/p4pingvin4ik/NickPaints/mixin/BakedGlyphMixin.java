@@ -17,6 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.awt.Color;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Mixin(BakedGlyph.class)
 public abstract class BakedGlyphMixin {
@@ -51,6 +52,13 @@ public abstract class BakedGlyphMixin {
             return;
         }
 
+        if (gradientData.isNicknameRestricted()) {
+            int glyphIndex = GradientData.NAMETAG_GLYPH_INDEX.get().getAndIncrement();
+            if (glyphIndex < gradientData.paintGlyphStart || glyphIndex >= gradientData.paintGlyphEnd) {
+                return;
+            }
+        }
+
         if (NickPaintsMod.PROTECTED_TAG_INSERTION_KEY.equals(glyph.style().getInsertion())) {
             return;
         }
@@ -68,6 +76,18 @@ public abstract class BakedGlyphMixin {
         }
 
         ci.cancel();
+    }
+
+    /** Horizontal position in gradient space: nametags use an anchor so only the nickname spans the palette. */
+    @Unique
+    private static float gradientSpaceX(float pixelX, GradientData data) {
+        if (!data.isNicknameRestricted()) {
+            return pixelX;
+        }
+        AtomicReference<Float> ref = GradientData.NAMETAG_GRADIENT_ANCHOR_X.get();
+        ref.compareAndSet(null, pixelX);
+        Float anchor = ref.get();
+        return pixelX - (anchor != null ? anchor : 0f);
     }
 
     /**
@@ -110,7 +130,7 @@ public abstract class BakedGlyphMixin {
 
         for (int i = 0; i < numBlocks; i++) {
             float normalizedY = (i + 0.5f) * blockHeight;
-            int blockColor = GradientUtil.get2DColor(data.paintString, data.totalLength, baseX + this.minX, normalizedY);
+            int blockColor = GradientUtil.get2DColor(data.paintString, data.totalLength, gradientSpaceX(baseX + this.minX, data), normalizedY);
 
             if (isShadow) {
                 blockColor = darken(blockColor);
@@ -141,10 +161,10 @@ public abstract class BakedGlyphMixin {
         float glyphRelativeTopY = 0;
         float glyphRelativeBottomY = maxY - minY;
 
-        int colorTopLeft = GradientUtil.get2DColor(data.paintString, data.totalLength, baseX + minX, glyphRelativeTopY);
-        int colorBottomLeft = GradientUtil.get2DColor(data.paintString, data.totalLength, baseX + minX, glyphRelativeBottomY);
-        int colorBottomRight = GradientUtil.get2DColor(data.paintString, data.totalLength, baseX + maxX, glyphRelativeBottomY);
-        int colorTopRight = GradientUtil.get2DColor(data.paintString, data.totalLength, baseX + maxX, glyphRelativeTopY);
+        int colorTopLeft = GradientUtil.get2DColor(data.paintString, data.totalLength, gradientSpaceX(baseX + minX, data), glyphRelativeTopY);
+        int colorBottomLeft = GradientUtil.get2DColor(data.paintString, data.totalLength, gradientSpaceX(baseX + minX, data), glyphRelativeBottomY);
+        int colorBottomRight = GradientUtil.get2DColor(data.paintString, data.totalLength, gradientSpaceX(baseX + maxX, data), glyphRelativeBottomY);
+        int colorTopRight = GradientUtil.get2DColor(data.paintString, data.totalLength, gradientSpaceX(baseX + maxX, data), glyphRelativeTopY);
 
         if (isShadow) {
             colorTopLeft = darken(colorTopLeft);

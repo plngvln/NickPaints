@@ -16,9 +16,12 @@ import net.p4pingvin4ik.NickPaints.client.WebSocketManager;
 import net.p4pingvin4ik.NickPaints.config.ConfigManager;
 import net.p4pingvin4ik.NickPaints.interfaces.IEntityProvider;
 import net.p4pingvin4ik.NickPaints.util.GradientData;
+import net.p4pingvin4ik.NickPaints.util.NametagNicknameLocator;
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+
+import java.util.Optional;
 
 @Mixin(value = EntityRenderer.class, priority = 990)
 public abstract class EntityRendererMixin<T extends Entity, S extends EntityRenderState> {
@@ -46,13 +49,32 @@ public abstract class EntityRendererMixin<T extends Entity, S extends EntityRend
         }
         if (paintToShow != null && !paintToShow.trim().isEmpty()) {
             try {
-                int totalLength = calculatePaintableLength(text);
+                int paintGlyphStart = -1;
+                int paintGlyphEnd = -1;
+                int totalLength;
+                if (entity instanceof PlayerEntity pl) {
+                    Optional<NametagNicknameLocator.CharRange> nickname = NametagNicknameLocator.findNicknameRange(text, pl);
+                    if (nickname.isPresent() && nickname.get().length() > 0) {
+                        paintGlyphStart = nickname.get().start();
+                        paintGlyphEnd = nickname.get().end();
+                        totalLength = nickname.get().length();
+                    } else {
+                        totalLength = calculatePaintableLength(text);
+                    }
+                } else {
+                    totalLength = calculatePaintableLength(text);
+                }
                 if (totalLength > 0) {
-                    GradientData.CURRENT_GRADIENT.set(new GradientData(paintToShow, totalLength));
+                    if (paintGlyphStart >= 0) {
+                        GradientData.NAMETAG_GLYPH_INDEX.get().set(0);
+                        GradientData.NAMETAG_GRADIENT_ANCHOR_X.get().set(null);
+                    }
+                    GradientData.CURRENT_GRADIENT.set(new GradientData(paintToShow, totalLength, paintGlyphStart, paintGlyphEnd));
                 }
             } finally {
                 original.call(textRenderer, text, x, y, color, shadow, matrix, vertexConsumers, layerType, backgroundColor, light);
                 GradientData.CURRENT_GRADIENT.remove();
+                GradientData.NAMETAG_GRADIENT_ANCHOR_X.get().set(null);
             }
         } else {
             original.call(textRenderer, text, x, y, color, shadow, matrix, vertexConsumers, layerType, backgroundColor, light);
