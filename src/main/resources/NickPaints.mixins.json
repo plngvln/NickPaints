@@ -10,9 +10,7 @@
   ],
   "client": [
     "BakedGlyphMixin",
-    "EntityRendererMixin",
-    "GameRendererMixin",
-    "MinecraftClientMixin"
+    "EntityRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1

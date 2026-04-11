@@ -37,10 +37,10 @@ public abstract class EntityRendererMixin<T extends Entity, S extends EntityRend
                 paintToShow = ConfigManager.CONFIG.currentGradient;
             } else {
                 String cachedPaint = WebSocketManager.paintCache.get(player.getUuid());
-                if (cachedPaint != null && !cachedPaint.equals("no_paint") && !cachedPaint.equals("fetching")) {
-                    paintToShow = cachedPaint;
-                } else if (cachedPaint == null) {
+                if (cachedPaint == null) {
                     WebSocketManager.queuePaintForPlayer(player.getUuid());
+                } else if (!cachedPaint.trim().isEmpty()) {
+                    paintToShow = cachedPaint;
                 }
             }
         }

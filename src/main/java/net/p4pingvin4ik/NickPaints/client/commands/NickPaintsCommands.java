@@ -11,7 +11,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.command.CommandRegistryAccess;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import net.p4pingvin4ik.NickPaints.client.ImGuiScreen;
+import net.p4pingvin4ik.NickPaints.client.NickPaintsScreen;
 import net.p4pingvin4ik.NickPaints.client.MojangAPIHelper;
 import net.p4pingvin4ik.NickPaints.client.WebSocketManager;
 import net.p4pingvin4ik.NickPaints.config.ConfigManager;
@@ -32,7 +32,7 @@ public class NickPaintsCommands {
         dispatcher.register(literal("nickpaints")
                 .executes(context -> {
                     MinecraftClient.getInstance().execute(() -> {
-                        MinecraftClient.getInstance().setScreen(new ImGuiScreen());
+                        MinecraftClient.getInstance().setScreen(new NickPaintsScreen());
                     });
                     return 1;
                 })

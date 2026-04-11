@@ -53,6 +53,12 @@ public class WebSocketManager implements WebSocket.Listener {
 
     private static final Object reconnectLock = new Object();
 
+    private static final Object paintSyncAckLock = new Object();
+    private static final ScheduledExecutorService paintSyncAckScheduler = Executors.newSingleThreadScheduledExecutor(
+            new ThreadFactoryBuilder().setNameFormat("NickPaints-PaintSyncAck-%d").setDaemon(true).build());
+    private static volatile boolean awaitingUserPaintSyncAck;
+    private static ScheduledFuture<?> paintSyncAckTimeoutTask;
+
     public static void connect() {
         manuallyDisconnected = false;
         authenticationPermanentlyFailed = false;
@@ -89,6 +95,7 @@ public class WebSocketManager implements WebSocket.Listener {
         isAuthenticated = false;
         isConnecting = false;
         reconnectAttempts = 0;
+        cancelPaintSyncAckWait();
         if (webSocket != null && !webSocket.isOutputClosed()) {
             webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "Client shutting down");
             webSocket = null;
@@ -141,6 +148,9 @@ public class WebSocketManager implements WebSocket.Listener {
                         break;
                     case "playerLeft":
                         handlePlayerLeft(payloadElement.getAsJsonObject());
+                        break;
+                    case "paintSyncAck":
+                        handlePaintSyncAckPayload(payloadElement.getAsJsonObject());
                         break;
                     default:
                         LOGGER.warn("Unknown authenticated message type: {}", type);
@@ -217,6 +227,7 @@ public class WebSocketManager implements WebSocket.Listener {
         isAuthenticated = false;
         isConnecting = false;
         WebSocketManager.webSocket = null;
+        cancelPaintSyncAckWait();
         handleDisconnection();
         return new CompletableFuture<>();
     }
@@ -229,6 +240,7 @@ public class WebSocketManager implements WebSocket.Listener {
         isAuthenticated = false;
         isConnecting = false;
         WebSocketManager.webSocket = null;
+        cancelPaintSyncAckWait();
         handleDisconnection();
     }
 
@@ -359,8 +371,8 @@ public class WebSocketManager implements WebSocket.Listener {
             sendMessageToPlayer(Text.translatable("chat.nickpaints.sync.failure", "Not authenticated").formatted(Formatting.RED));
             return;
         }
+        beginPaintSyncAckWait();
         sendPaintUpdateInternal();
-        sendMessageToPlayer(Text.translatable("chat.nickpaints.sync.success").formatted(Formatting.GREEN));
     }
 
     public static void syncMyPaintSilently(UUID myUuid) {
@@ -426,7 +438,75 @@ public class WebSocketManager implements WebSocket.Listener {
     public static void clearCache() {
         paintCache.clear();
         uuidQueue.clear();
+        cancelPaintSyncAckWait();
         LOGGER.info("All NickPaints caches have been cleared.");
+    }
+
+    private static void cancelPaintSyncAckWait() {
+        synchronized (paintSyncAckLock) {
+            awaitingUserPaintSyncAck = false;
+            if (paintSyncAckTimeoutTask != null) {
+                paintSyncAckTimeoutTask.cancel(false);
+                paintSyncAckTimeoutTask = null;
+            }
+        }
+    }
+
+    private static void beginPaintSyncAckWait() {
+        synchronized (paintSyncAckLock) {
+            if (paintSyncAckTimeoutTask != null) {
+                paintSyncAckTimeoutTask.cancel(false);
+                paintSyncAckTimeoutTask = null;
+            }
+            awaitingUserPaintSyncAck = true;
+            paintSyncAckTimeoutTask = paintSyncAckScheduler.schedule(WebSocketManager::onPaintSyncAckTimeout, 5, TimeUnit.SECONDS);
+        }
+    }
+
+    private static void onPaintSyncAckTimeout() {
+        boolean timedOut;
+        synchronized (paintSyncAckLock) {
+            timedOut = awaitingUserPaintSyncAck;
+            awaitingUserPaintSyncAck = false;
+            paintSyncAckTimeoutTask = null;
+        }
+        if (!timedOut) {
+            return;
+        }
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client != null) {
+            client.execute(() -> sendMessageToPlayer(Text.translatable("chat.nickpaints.sync.no_ack").formatted(Formatting.RED)));
+        }
+    }
+
+    private static void handlePaintSyncAckPayload(JsonObject payload) {
+        boolean ok = payload.has("ok") && payload.get("ok").getAsBoolean();
+        String error = payload.has("error") && !payload.get("error").isJsonNull() ? payload.get("error").getAsString() : null;
+        boolean wasWaiting;
+        synchronized (paintSyncAckLock) {
+            wasWaiting = awaitingUserPaintSyncAck;
+            awaitingUserPaintSyncAck = false;
+            if (paintSyncAckTimeoutTask != null) {
+                paintSyncAckTimeoutTask.cancel(false);
+                paintSyncAckTimeoutTask = null;
+            }
+        }
+        if (!wasWaiting) {
+            return;
+        }
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null) {
+            return;
+        }
+        client.execute(() -> {
+            if (ok) {
+                sendMessageToPlayer(Text.translatable("chat.nickpaints.sync.success").formatted(Formatting.GREEN));
+            } else if ("invalid_paint".equals(error)) {
+                sendMessageToPlayer(Text.translatable("chat.nickpaints.sync.invalid_paint").formatted(Formatting.RED));
+            } else {
+                sendMessageToPlayer(Text.translatable("chat.nickpaints.sync.failure", error != null ? error : "rejected").formatted(Formatting.RED));
+            }
+        });
     }
 
     private static void sendMessageToPlayer(Text message) {

@@ -6,9 +6,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.session.Session;
 import net.minecraft.client.util.InputUtil;
-import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.ClickEvent;
 import net.minecraft.text.HoverEvent;
@@ -44,27 +42,24 @@ public class NickPaintsMod implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (keyBinding.wasPressed()) {
-                client.setScreen(new ImGuiScreen());
+                client.setScreen(new NickPaintsScreen());
             }
             WebSocketManager.updateVisiblePlayers();
-            GradientCache.tick();
         });
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             VersionChecker.onPlayerJoin();
             WebSocketManager.connect();
-            Session session = client.getSession();
-            WebSocketManager.syncMyPaintSilently(session.getUuidOrNull());
 
             if (!ConfigManager.CONFIG.hasShownWelcomeMessage) {
                 new Thread(() -> {
                     try {
                         Thread.sleep(1500);
-                        if (client.player != null) {
-                            client.execute(() -> {
+                        client.execute(() -> {
+                            if (client.player != null) {
                                 client.player.playSound(SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME);
-                            });
-                            client.player.sendMessage(createWelcomeMessage(), false);
-                        }
+                                client.player.sendMessage(createWelcomeMessage(), false);
+                            }
+                        });
                     } catch (InterruptedException e) {
                         LOGGER.error("Failed to send NickPaints welcome message", e);
                     }
