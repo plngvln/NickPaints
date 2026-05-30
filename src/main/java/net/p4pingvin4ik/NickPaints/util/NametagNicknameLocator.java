@@ -3,6 +3,7 @@ package net.p4pingvin4ik.NickPaints.util;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.PlainTextContent;
 import net.minecraft.text.Text;
+import net.p4pingvin4ik.NickPaints.client.NickPaintsMod;
 
 import java.util.Optional;
 
@@ -56,13 +57,22 @@ public final class NametagNicknameLocator {
     }
 
     private static Optional<CharRange> walkLeaf(Text component, String target, Cursor cursor) {
+        if (NickPaintsMod.PROTECTED_TAG_INSERTION_KEY.equals(component.getStyle().getInsertion())) {
+            return Optional.empty();
+        }
         if (component.getContent() instanceof PlainTextContent literal) {
             String s = literal.string();
+            int nonWsCount = 0;
+            for (int i = 0; i < s.length(); i++) {
+                if (!Character.isWhitespace(s.charAt(i))) {
+                    nonWsCount++;
+                }
+            }
             int start = cursor.index;
             if (s.equals(target)) {
-                return Optional.of(new CharRange(start, start + s.length()));
+                return Optional.of(new CharRange(start, start + nonWsCount));
             }
-            cursor.index += s.length();
+            cursor.index += nonWsCount;
         }
         for (Text sibling : component.getSiblings()) {
             Optional<CharRange> hit = walkLeaf(sibling, target, cursor);
@@ -80,8 +90,17 @@ public final class NametagNicknameLocator {
     }
 
     private static void appendPlain(Text component, StringBuilder sb) {
+        if (NickPaintsMod.PROTECTED_TAG_INSERTION_KEY.equals(component.getStyle().getInsertion())) {
+            return;
+        }
         if (component.getContent() instanceof PlainTextContent literal) {
-            sb.append(literal.string());
+            String s = literal.string();
+            for (int i = 0; i < s.length(); i++) {
+                char c = s.charAt(i);
+                if (!Character.isWhitespace(c)) {
+                    sb.append(c);
+                }
+            }
         }
         for (Text sibling : component.getSiblings()) {
             appendPlain(sibling, sb);

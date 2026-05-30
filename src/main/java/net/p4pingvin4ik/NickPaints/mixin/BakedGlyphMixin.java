@@ -52,15 +52,15 @@ public abstract class BakedGlyphMixin {
             return;
         }
 
+        if (NickPaintsMod.PROTECTED_TAG_INSERTION_KEY.equals(glyph.style().getInsertion())) {
+            return;
+        }
+
         if (gradientData.isNicknameRestricted()) {
             int glyphIndex = GradientData.NAMETAG_GLYPH_INDEX.get().getAndIncrement();
             if (glyphIndex < gradientData.paintGlyphStart || glyphIndex >= gradientData.paintGlyphEnd) {
                 return;
             }
-        }
-
-        if (NickPaintsMod.PROTECTED_TAG_INSERTION_KEY.equals(glyph.style().getInsertion())) {
-            return;
         }
 
         if (glyph.shadowColor() != 0) {

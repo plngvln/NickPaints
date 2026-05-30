@@ -87,7 +87,12 @@ public abstract class EntityRendererMixin<T extends Entity, S extends EntityRend
         }
         int length = 0;
         if (component.getContent() instanceof PlainTextContent literalContent) {
-            length = literalContent.string().length();
+            String s = literalContent.string();
+            for (int i = 0; i < s.length(); i++) {
+                if (!Character.isWhitespace(s.charAt(i))) {
+                    length++;
+                }
+            }
         }
         for (Text sibling : component.getSiblings()) {
             length += calculatePaintableLength(sibling);
