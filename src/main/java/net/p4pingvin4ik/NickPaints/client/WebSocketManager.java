@@ -96,6 +96,7 @@ public class WebSocketManager implements WebSocket.Listener {
         isConnecting = false;
         reconnectAttempts = 0;
         cancelPaintSyncAckWait();
+        resetVisibilityTracking();
         if (webSocket != null && !webSocket.isOutputClosed()) {
             webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "Client shutting down");
             webSocket = null;
@@ -186,13 +187,25 @@ public class WebSocketManager implements WebSocket.Listener {
         }
 
         tickCounter++;
-        if (tickCounter < 100) {
+        // ~1s at 20 TPS — keep subscriptions fresh without spamming
+        if (tickCounter < 20) {
             return;
         }
         tickCounter = 0;
+        syncVisiblePlayersNow(false);
+    }
 
+    /**
+     * Re-registers visibility subscriptions with the server.
+     * Must be forced after (re)auth: otherwise lastVisiblePlayers can match the world
+     * while the server has empty subscriptions, so paintUpdate never arrives.
+     */
+    private static void syncVisiblePlayersNow(boolean force) {
+        if (!isAuthenticated || webSocket == null) {
+            return;
+        }
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player == null) {
+        if (client.player == null || client.world == null) {
             return;
         }
         final UUID selfUuid = client.player.getUuid();
@@ -201,23 +214,39 @@ public class WebSocketManager implements WebSocket.Listener {
                 .map(player -> player.getUuid())
                 .collect(Collectors.toSet());
 
-        if (!lastVisiblePlayers.equals(currentlyVisiblePlayers)) {
-            lastVisiblePlayers.clear();
-            lastVisiblePlayers.addAll(currentlyVisiblePlayers);
-
-            List<String> uuidsAsString = currentlyVisiblePlayers.stream()
-                    .map(UUID::toString)
-                    .collect(Collectors.toList());
-
-            JsonObject payload = new JsonObject();
-            payload.add("uuids", gson.toJsonTree(uuidsAsString));
-
-            JsonObject message = new JsonObject();
-            message.addProperty("type", "updateVisiblePlayers");
-            message.add("payload", payload);
-
-            webSocket.sendText(gson.toJson(message), true);
+        if (!force && lastVisiblePlayers.equals(currentlyVisiblePlayers)) {
+            return;
         }
+
+        // Newly visible players may have missed paintUpdate while we were not subscribed —
+        // drop their cache entries so requestPaints picks up the latest paint.
+        for (UUID uuid : currentlyVisiblePlayers) {
+            if (force || !lastVisiblePlayers.contains(uuid)) {
+                paintCache.remove(uuid);
+                uuidQueue.add(uuid);
+            }
+        }
+
+        lastVisiblePlayers.clear();
+        lastVisiblePlayers.addAll(currentlyVisiblePlayers);
+
+        List<String> uuidsAsString = currentlyVisiblePlayers.stream()
+                .map(UUID::toString)
+                .collect(Collectors.toList());
+
+        JsonObject payload = new JsonObject();
+        payload.add("uuids", gson.toJsonTree(uuidsAsString));
+
+        JsonObject message = new JsonObject();
+        message.addProperty("type", "updateVisiblePlayers");
+        message.add("payload", payload);
+
+        webSocket.sendText(gson.toJson(message), true);
+    }
+
+    private static void resetVisibilityTracking() {
+        lastVisiblePlayers.clear();
+        tickCounter = 0;
     }
     @Override
     public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
@@ -228,6 +257,7 @@ public class WebSocketManager implements WebSocket.Listener {
         isConnecting = false;
         WebSocketManager.webSocket = null;
         cancelPaintSyncAckWait();
+        resetVisibilityTracking();
         handleDisconnection();
         return new CompletableFuture<>();
     }
@@ -241,6 +271,7 @@ public class WebSocketManager implements WebSocket.Listener {
         isConnecting = false;
         WebSocketManager.webSocket = null;
         cancelPaintSyncAckWait();
+        resetVisibilityTracking();
         handleDisconnection();
     }
 
@@ -287,7 +318,14 @@ public class WebSocketManager implements WebSocket.Listener {
             LOGGER.info("Authentication successful. Welcome, {}!", username);
         }
         reconnectAttempts = 0;
+        // Server subscriptions are empty after (re)connect; force a visibility resync
+        // even if the nearby player set looks unchanged on the client.
+        resetVisibilityTracking();
         startQueueProcessor();
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client != null) {
+            client.execute(() -> syncVisiblePlayersNow(true));
+        }
     }
 
     private void handlePaintUpdate(JsonObject payload) {
@@ -439,6 +477,10 @@ public class WebSocketManager implements WebSocket.Listener {
         paintCache.clear();
         uuidQueue.clear();
         cancelPaintSyncAckWait();
+        resetVisibilityTracking();
+        if (isAuthenticated) {
+            syncVisiblePlayersNow(true);
+        }
         LOGGER.info("All NickPaints caches have been cleared.");
     }
 
