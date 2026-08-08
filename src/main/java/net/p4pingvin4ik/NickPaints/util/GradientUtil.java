@@ -60,8 +60,14 @@ public class GradientUtil {
         String normalizedGradient = gradientString.trim().toLowerCase(Locale.ROOT);
         GradientOptions options = parseOptions(gradientString, totalLength);
 
-        if (RAINBOW_PATTERN.matcher(normalizedGradient).matches()) {
-            return get2DRainbowColor(options, localX, localY);
+        Matcher rainbowMatcher = RAINBOW_PATTERN.matcher(normalizedGradient);
+        if (rainbowMatcher.matches()) {
+            long rainbowSpeed = 3000L;
+            try {
+                rainbowSpeed = Math.max(MIN_ANIMATION_SPEED, Long.parseLong(rainbowMatcher.group(1)));
+            } catch (NumberFormatException ignored) {
+            }
+            return get2DRainbowColor(rainbowSpeed, options.angle(), localX, localY);
         }
 
         if (options.colors().isEmpty()) return Color.WHITE.getRGB();
@@ -188,12 +194,11 @@ public class GradientUtil {
         return new GradientOptions(speed, segmentLength, isStatic, isBlockStyle, angle, isSegmentUserDefined, colors);
     }
 
-    private static int get2DRainbowColor(GradientOptions options, float localX, float localY) {
-        float angleRad = (float) Math.toRadians(options.angle());
+    private static int get2DRainbowColor(long speed, float angle, float localX, float localY) {
+        float angleRad = (float) Math.toRadians(angle);
         float cos = (float) Math.cos(angleRad);
         float sin = (float) Math.sin(angleRad);
         float projectedPosition = localX * cos + localY * sin;
-        long speed = options.speed();
         float timeOffset = (float) (System.currentTimeMillis() % speed) / speed;
         float hue = normalizeProgress(timeOffset - projectedPosition * 0.1f);
         return Color.HSBtoRGB(hue, 0.8f, 1.0f);

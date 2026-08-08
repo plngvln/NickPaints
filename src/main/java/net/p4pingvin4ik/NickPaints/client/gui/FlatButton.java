@@ -1,10 +1,11 @@
 package net.p4pingvin4ik.NickPaints.client.gui;
 
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
 
-public class FlatButton extends ButtonWidget {
+public class FlatButton extends Button {
 
     public enum Variant { NORMAL, PRIMARY, DANGER, GHOST }
 
@@ -33,11 +34,11 @@ public class FlatButton extends ButtonWidget {
     private boolean toggled  = false;
     private boolean pressed  = false;
 
-    public FlatButton(int x, int y, int width, int height, Text message, PressAction onPress) {
-        super(x, y, width, height, message, onPress, DEFAULT_NARRATION_SUPPLIER);
+    public FlatButton(int x, int y, int width, int height, Component message, OnPress onPress) {
+        super(x, y, width, height, message, onPress, DEFAULT_NARRATION);
     }
 
-    public static FlatButtonBuilder create(Text message, PressAction action) {
+    public static FlatButtonBuilder create(Component message, OnPress action) {
         return new FlatButtonBuilder(message, action);
     }
 
@@ -45,7 +46,7 @@ public class FlatButton extends ButtonWidget {
     public FlatButton toggled(boolean t)  { this.toggled = t; return this; }
 
     @Override
-    protected void renderWidget(DrawContext ctx, int mx, int my, float delta) {
+    protected void extractContents(GuiGraphicsExtractor ctx, int mx, int my, float delta) {
         if (!visible) return;
 
         boolean hov  = isHovered();
@@ -103,33 +104,33 @@ public class FlatButton extends ButtonWidget {
                 : C_TEXT_OFF;
 
         int ty = y + (h - 8) / 2;
-        ctx.drawCenteredTextWithShadow(
-                net.minecraft.client.MinecraftClient.getInstance().textRenderer,
+        ctx.centeredText(
+                net.minecraft.client.Minecraft.getInstance().font,
                 getMessage(), x + w / 2, ty, textColor
         );
     }
 
     @Override
-    public boolean mouseClicked(double mx, double my, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         if (isHovered() && active && visible) pressed = true;
-        return super.mouseClicked(mx, my, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override
-    public boolean mouseReleased(double mx, double my, int button) {
+    public boolean mouseReleased(MouseButtonEvent event) {
         pressed = false;
-        return super.mouseReleased(mx, my, button);
+        return super.mouseReleased(event);
     }
 
     // ── Convenience builder ───────────────────────────────────────────────────
     public static class FlatButtonBuilder {
-        private final Text message;
-        private final PressAction action;
+        private final Component message;
+        private final OnPress action;
         private int x, y, w = 80, h = 20;
         private Variant variant = Variant.NORMAL;
         private boolean toggled = false;
 
-        public FlatButtonBuilder(Text message, PressAction action) {
+        public FlatButtonBuilder(Component message, OnPress action) {
             this.message = message;
             this.action  = action;
         }

@@ -1,6 +1,6 @@
 {
   "key.nickpaints.open_gui": "Адкрыць налады NickPaints",
-  "category.nickpaints.main": "NickPaints",
+  "key.category.nickpaints.main": "NickPaints",
   "chat.nickpaints.sync.success": "Малюнак паспяхова сінхранізаваны з воблакам!",
   "chat.nickpaints.sync.failure": "Не ўдалося сінхранізаваць: %s",
   "chat.nickpaints.sync.auth_failed": "Аўтэнтыфікацыя не прайшла. Паспрабуй перазапусціць гульню.",

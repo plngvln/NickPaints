@@ -6,12 +6,11 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.exceptions.AuthenticationException;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.session.Session;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.User;
+import net.minecraft.network.chat.Component;
 import net.p4pingvin4ik.NickPaints.config.ConfigManager;
 import org.slf4j.Logger;
 
@@ -23,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 public class WebSocketManager implements WebSocket.Listener {
@@ -43,10 +43,18 @@ public class WebSocketManager implements WebSocket.Listener {
     private static volatile boolean manuallyDisconnected = false;
     private static volatile boolean authenticationPermanentlyFailed = false;
 
+    /** Monotonic id so stale onOpen/onClose/onError cannot wipe a newer session. */
+    private static final AtomicLong CONNECTION_GENERATION = new AtomicLong(0);
+    private static volatile long activeConnectionId = 0;
+    private static volatile long openedConnectionId = 0;
+    private static volatile boolean disconnectionHandled = false;
+
     private static ScheduledExecutorService scheduler;
     private static ScheduledFuture<?> queueProcessorTask;
 
     private static final WebSocketManager INSTANCE = new WebSocketManager();
+
+    private final StringBuilder textFragmentBuffer = new StringBuilder();
 
     private static final Set<UUID> lastVisiblePlayers = new CopyOnWriteArraySet<>();
     private static int tickCounter = 0;
@@ -58,14 +66,20 @@ public class WebSocketManager implements WebSocket.Listener {
             new ThreadFactoryBuilder().setNameFormat("NickPaints-PaintSyncAck-%d").setDaemon(true).build());
     private static volatile boolean awaitingUserPaintSyncAck;
     private static ScheduledFuture<?> paintSyncAckTimeoutTask;
+    /** When set, successful ack persists this gradient; failure/timeout rolls back to previous. */
+    private static String pendingPersistGradient;
+    private static String previousGradientBeforePersist;
 
     public static void connect() {
         manuallyDisconnected = false;
         authenticationPermanentlyFailed = false;
-        if (isAuthenticated || isConnecting || MinecraftClient.getInstance().getSession().getUuidOrNull() == null) {
+        if (isAuthenticated || isConnecting || Minecraft.getInstance().getUser().getProfileId() == null) {
             return;
         }
         isConnecting = true;
+        final long connectionId = CONNECTION_GENERATION.incrementAndGet();
+        activeConnectionId = connectionId;
+        disconnectionHandled = false;
         try {
             if (reconnectAttempts == 0) {
                 LOGGER.info("Connecting to NickPaints server...");
@@ -74,19 +88,24 @@ public class WebSocketManager implements WebSocket.Listener {
                     .header("X-API-Key", ConfigManager.CONFIG.apiKey)
                     .buildAsync(URI.create(ConfigManager.CONFIG.baseUrl), INSTANCE)
                     .exceptionally(e -> {
+                        if (connectionId != activeConnectionId) {
+                            return null;
+                        }
                         isConnecting = false;
                         if (reconnectAttempts <= MAX_LOGGED_RECONNECT_ATTEMPTS) {
                             LOGGER.error("WebSocket connection failed to build: {}", e.getMessage());
                         }
-                        handleDisconnection();
+                        handleDisconnectionOnce(connectionId);
                         return null;
                     });
         } catch (Exception e) {
-            isConnecting = false;
+            if (connectionId == activeConnectionId) {
+                isConnecting = false;
+            }
             if (reconnectAttempts <= MAX_LOGGED_RECONNECT_ATTEMPTS) {
                 LOGGER.error("Failed to initiate WebSocket connection", e);
             }
-            handleDisconnection();
+            handleDisconnectionOnce(connectionId);
         }
     }
 
@@ -95,8 +114,11 @@ public class WebSocketManager implements WebSocket.Listener {
         isAuthenticated = false;
         isConnecting = false;
         reconnectAttempts = 0;
+        disconnectionHandled = true;
+        activeConnectionId = CONNECTION_GENERATION.incrementAndGet();
         cancelPaintSyncAckWait();
         resetVisibilityTracking();
+        INSTANCE.textFragmentBuffer.setLength(0);
         if (webSocket != null && !webSocket.isOutputClosed()) {
             webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "Client shutting down");
             webSocket = null;
@@ -105,18 +127,62 @@ public class WebSocketManager implements WebSocket.Listener {
         LOGGER.info("WebSocket disconnected manually.");
     }
 
+    /**
+     * World/server leave: clear visibility on the paint server, drop caches, close the socket.
+     */
+    public static void onWorldDisconnect() {
+        if (isAuthenticated && webSocket != null && !webSocket.isOutputClosed()) {
+            try {
+                JsonObject payload = new JsonObject();
+                payload.add("uuids", new JsonArray());
+                JsonObject message = new JsonObject();
+                message.addProperty("type", "updateVisiblePlayers");
+                message.add("payload", payload);
+                webSocket.sendText(gson.toJson(message), true);
+            } catch (Exception e) {
+                LOGGER.debug("Failed to send empty visibility on world disconnect: {}", e.getMessage());
+            }
+        }
+        paintCache.clear();
+        uuidQueue.clear();
+        disconnect();
+    }
+
     @Override
     public void onOpen(WebSocket ws) {
+        if (openedConnectionId == activeConnectionId && webSocket != null && webSocket != ws) {
+            // Newer connect already in progress; ignore stale open.
+            try {
+                ws.sendClose(WebSocket.NORMAL_CLOSURE, "Stale connection");
+            } catch (Exception ignored) {
+            }
+            return;
+        }
+        openedConnectionId = activeConnectionId;
         WebSocketManager.webSocket = ws;
-        isConnecting = false;
+        textFragmentBuffer.setLength(0);
+        // Keep isConnecting true until auth_success / auth_failure so JOIN cannot open a second socket.
         LOGGER.info("WebSocket connection opened, awaiting authentication challenge...");
         ws.request(1);
     }
 
     @Override
     public CompletionStage<?> onText(WebSocket ws, CharSequence data, boolean last) {
+        if (openedConnectionId != activeConnectionId || (webSocket != null && webSocket != ws)) {
+            ws.request(1);
+            return null;
+        }
         try {
-            String raw = data != null ? data.toString() : "";
+            if (data != null) {
+                textFragmentBuffer.append(data);
+            }
+            if (!last) {
+                ws.request(1);
+                return null;
+            }
+            String raw = textFragmentBuffer.toString();
+            textFragmentBuffer.setLength(0);
+
             if (raw.trim().isEmpty()) {
                 LOGGER.warn("Received empty WebSocket message");
                 ws.request(1);
@@ -124,14 +190,14 @@ public class WebSocketManager implements WebSocket.Listener {
             }
             JsonElement parsedElement = JsonParser.parseString(raw);
             if (!parsedElement.isJsonObject()) {
-                LOGGER.warn("Received non-JSON-object message: {}", data);
+                LOGGER.warn("Received non-JSON-object message: {}", raw);
                 ws.request(1);
                 return null;
             }
 
             JsonObject message = parsedElement.getAsJsonObject();
             if (!message.has("type") || !message.has("payload")) {
-                LOGGER.warn("Received message with missing 'type' or 'payload': {}", data);
+                LOGGER.warn("Received message with missing 'type' or 'payload': {}", raw);
                 ws.request(1);
                 return null;
             }
@@ -167,6 +233,7 @@ public class WebSocketManager implements WebSocket.Listener {
                         break;
                     case "auth_failure":
                         LOGGER.error("Authentication failed: {}", payloadElement.getAsJsonObject().get("error").getAsString());
+                        isConnecting = false;
                         authenticationPermanentlyFailed = true;
                         disconnect();
                         break;
@@ -176,13 +243,14 @@ public class WebSocketManager implements WebSocket.Listener {
                 }
             }
         } catch (Exception e) {
+            textFragmentBuffer.setLength(0);
             LOGGER.error("Failed to process WebSocket message: {}", data != null ? data.toString() : "(null)", e);
         }
         ws.request(1);
         return null;
     }
     public static void updateVisiblePlayers() {
-        if (!isAuthenticated || webSocket == null || MinecraftClient.getInstance().world == null) {
+        if (!isAuthenticated || webSocket == null || Minecraft.getInstance().level == null) {
             return;
         }
 
@@ -204,14 +272,14 @@ public class WebSocketManager implements WebSocket.Listener {
         if (!isAuthenticated || webSocket == null) {
             return;
         }
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player == null || client.world == null) {
+        Minecraft client = Minecraft.getInstance();
+        if (client.player == null || client.level == null) {
             return;
         }
-        final UUID selfUuid = client.player.getUuid();
-        Set<UUID> currentlyVisiblePlayers = client.world.getPlayers().stream()
-                .filter(player -> !player.getUuid().equals(selfUuid))
-                .map(player -> player.getUuid())
+        final UUID selfUuid = client.player.getUUID();
+        Set<UUID> currentlyVisiblePlayers = client.level.players().stream()
+                .filter(player -> !player.getUUID().equals(selfUuid))
+                .map(player -> player.getUUID())
                 .collect(Collectors.toSet());
 
         if (!force && lastVisiblePlayers.equals(currentlyVisiblePlayers)) {
@@ -250,55 +318,62 @@ public class WebSocketManager implements WebSocket.Listener {
     }
     @Override
     public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
+        if (openedConnectionId != activeConnectionId || (WebSocketManager.webSocket != null && WebSocketManager.webSocket != webSocket)) {
+            return null;
+        }
         if (isAuthenticated && reconnectAttempts <= MAX_LOGGED_RECONNECT_ATTEMPTS) {
             LOGGER.warn("WebSocket closed unexpectedly: {} - {}", statusCode, reason);
         }
         isAuthenticated = false;
-        isConnecting = false;
         WebSocketManager.webSocket = null;
+        textFragmentBuffer.setLength(0);
         cancelPaintSyncAckWait();
         resetVisibilityTracking();
-        handleDisconnection();
-        return new CompletableFuture<>();
+        handleDisconnectionOnce(openedConnectionId);
+        return null;
     }
 
     @Override
     public void onError(WebSocket webSocket, Throwable error) {
+        if (openedConnectionId != activeConnectionId || (WebSocketManager.webSocket != null && WebSocketManager.webSocket != webSocket)) {
+            return;
+        }
         if (reconnectAttempts <= MAX_LOGGED_RECONNECT_ATTEMPTS) {
             LOGGER.error("WebSocket error occurred: {}", error.getMessage());
         }
         isAuthenticated = false;
-        isConnecting = false;
         WebSocketManager.webSocket = null;
+        textFragmentBuffer.setLength(0);
         cancelPaintSyncAckWait();
         resetVisibilityTracking();
-        handleDisconnection();
+        // Shared with onClose via disconnectionHandled so reconnect runs at most once.
+        handleDisconnectionOnce(openedConnectionId);
     }
 
     private void handleAuthChallenge(WebSocket ws, String authHash) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        Session session = client.getSession();
+        Minecraft client = Minecraft.getInstance();
+        User session = client.getUser();
 
         JsonObject verifyPayload = new JsonObject();
         verifyPayload.addProperty("paint", ConfigManager.CONFIG.currentGradient);
 
         JsonObject verifyMessage = new JsonObject();
 
-        if (client.isInSingleplayer()) {
+        if (client.isLocalServer()) {
             LOGGER.info("In singleplayer mode, using token authentication...");
             verifyMessage.addProperty("type", "auth_verify_token");
-            verifyPayload.addProperty("uuid", session.getUuidOrNull().toString());
+            verifyPayload.addProperty("uuid", session.getProfileId().toString());
             verifyPayload.addProperty("accessToken", session.getAccessToken());
         } else {
             LOGGER.info("In multiplayer mode, using session authentication...");
             try {
-                GameProfile gameProfile = new GameProfile(session.getUuidOrNull(), session.getUsername());
-                client.getSessionService().joinServer(gameProfile.getId(), session.getAccessToken(), authHash);
+                client.services().sessionService().joinServer(session.getProfileId(), session.getAccessToken(), authHash);
 
                 verifyMessage.addProperty("type", "auth_verify_session");
-                verifyPayload.addProperty("username", session.getUsername());
+                verifyPayload.addProperty("username", session.getName());
             } catch (AuthenticationException e) {
                 LOGGER.error("Session authentication failed. This can happen with a cracked client or invalid session. Disabling auto-reconnect.");
+                isConnecting = false;
                 authenticationPermanentlyFailed = true;
                 disconnect();
                 return;
@@ -311,6 +386,7 @@ public class WebSocketManager implements WebSocket.Listener {
 
     private void handleAuthSuccess(JsonObject payload) {
         isAuthenticated = true;
+        isConnecting = false;
         String username = payload.get("username").getAsString();
         if (reconnectAttempts > 0) {
             LOGGER.info("Successfully authenticated with server after {} attempt(s). Welcome, {}!", reconnectAttempts, username);
@@ -322,7 +398,7 @@ public class WebSocketManager implements WebSocket.Listener {
         // even if the nearby player set looks unchanged on the client.
         resetVisibilityTracking();
         startQueueProcessor();
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client != null) {
             client.execute(() -> syncVisiblePlayersNow(true));
         }
@@ -331,7 +407,7 @@ public class WebSocketManager implements WebSocket.Listener {
     private void handlePaintUpdate(JsonObject payload) {
         UUID uuid = UUID.fromString(payload.get("uuid").getAsString());
         String paint = payload.has("paint") ? payload.get("paint").getAsString() : "";
-        paintCache.put(uuid, paint);
+        putPaintInCache(uuid, paint);
     }
 
     private void handlePaintData(JsonArray paints) {
@@ -339,19 +415,38 @@ public class WebSocketManager implements WebSocket.Listener {
             JsonObject paintObj = element.getAsJsonObject();
             UUID uuid = UUID.fromString(paintObj.get("uuid").getAsString());
             String paint = paintObj.has("paint") ? paintObj.get("paint").getAsString() : "";
-            paintCache.put(uuid, paint);
+            putPaintInCache(uuid, paint);
         }
+    }
+
+    private static void putPaintInCache(UUID uuid, String paint) {
+        paintCache.put(uuid, paint == null ? "" : paint);
     }
 
     private void handlePlayerLeft(JsonObject payload) {
         UUID uuid = UUID.fromString(payload.get("uuid").getAsString());
         paintCache.remove(uuid);
+        // Drop from last-visible so the next sync re-subscribes if they are still in the world
+        // (or when they reconnect while still nearby).
+        lastVisiblePlayers.remove(uuid);
+    }
+
+    private static void handleDisconnectionOnce(long connectionId) {
+        synchronized (reconnectLock) {
+            if (connectionId != activeConnectionId || disconnectionHandled) {
+                return;
+            }
+            disconnectionHandled = true;
+            // End in-flight connect/auth so scheduleReconnect may proceed exactly once.
+            isConnecting = false;
+            isAuthenticated = false;
+        }
+        handleDisconnection();
     }
 
     private static void handleDisconnection() {
         stopQueueProcessor();
-        if (isAuthenticated || isConnecting) {
-            isAuthenticated = false;
+        if (manuallyDisconnected || authenticationPermanentlyFailed) {
             return;
         }
         scheduleReconnect();
@@ -406,17 +501,25 @@ public class WebSocketManager implements WebSocket.Listener {
 
     public static void syncMyPaint() {
         if (!isAuthenticated) {
-            sendMessageToPlayer(Text.translatable("chat.nickpaints.sync.failure", "Not authenticated").formatted(Formatting.RED));
+            sendMessageToPlayer(Component.translatable("chat.nickpaints.sync.failure", "Not authenticated").withStyle(ChatFormatting.RED));
             return;
         }
-        beginPaintSyncAckWait();
+        beginPaintSyncAckWait(false, null, null);
         sendPaintUpdateInternal();
     }
 
-    public static void syncMyPaintSilently(UUID myUuid) {
-        if (myUuid == null || !isAuthenticated) {
+    /**
+     * Applies {@code newGradient} locally for sync/display, waits for server ack,
+     * then persists on success or rolls back on failure/timeout.
+     */
+    public static void syncMyPaintAndPersist(String newGradient) {
+        if (!isAuthenticated) {
+            sendMessageToPlayer(Component.translatable("chat.nickpaints.sync.failure", "Not authenticated").withStyle(ChatFormatting.RED));
             return;
         }
+        String previous = ConfigManager.CONFIG.currentGradient;
+        ConfigManager.CONFIG.currentGradient = newGradient;
+        beginPaintSyncAckWait(true, newGradient, previous);
         sendPaintUpdateInternal();
     }
 
@@ -437,9 +540,10 @@ public class WebSocketManager implements WebSocket.Listener {
     }
 
     public static void queuePaintForPlayer(UUID playerUuid) {
-        if (playerUuid != null && !paintCache.containsKey(playerUuid)) {
-            uuidQueue.add(playerUuid);
+        if (playerUuid == null || paintCache.containsKey(playerUuid)) {
+            return;
         }
+        uuidQueue.add(playerUuid);
     }
 
     public static void processQueue() {
@@ -487,6 +591,8 @@ public class WebSocketManager implements WebSocket.Listener {
     private static void cancelPaintSyncAckWait() {
         synchronized (paintSyncAckLock) {
             awaitingUserPaintSyncAck = false;
+            pendingPersistGradient = null;
+            previousGradientBeforePersist = null;
             if (paintSyncAckTimeoutTask != null) {
                 paintSyncAckTimeoutTask.cancel(false);
                 paintSyncAckTimeoutTask = null;
@@ -494,30 +600,44 @@ public class WebSocketManager implements WebSocket.Listener {
         }
     }
 
-    private static void beginPaintSyncAckWait() {
+    private static void beginPaintSyncAckWait(boolean persistOnAck, String pendingGradient, String previousGradient) {
         synchronized (paintSyncAckLock) {
             if (paintSyncAckTimeoutTask != null) {
                 paintSyncAckTimeoutTask.cancel(false);
                 paintSyncAckTimeoutTask = null;
             }
             awaitingUserPaintSyncAck = true;
+            if (persistOnAck) {
+                pendingPersistGradient = pendingGradient;
+                previousGradientBeforePersist = previousGradient;
+            } else {
+                pendingPersistGradient = null;
+                previousGradientBeforePersist = null;
+            }
             paintSyncAckTimeoutTask = paintSyncAckScheduler.schedule(WebSocketManager::onPaintSyncAckTimeout, 5, TimeUnit.SECONDS);
         }
     }
 
     private static void onPaintSyncAckTimeout() {
         boolean timedOut;
+        String previous;
         synchronized (paintSyncAckLock) {
             timedOut = awaitingUserPaintSyncAck;
             awaitingUserPaintSyncAck = false;
             paintSyncAckTimeoutTask = null;
+            previous = previousGradientBeforePersist;
+            pendingPersistGradient = null;
+            previousGradientBeforePersist = null;
         }
         if (!timedOut) {
             return;
         }
-        MinecraftClient client = MinecraftClient.getInstance();
+        if (previous != null) {
+            ConfigManager.CONFIG.currentGradient = previous;
+        }
+        Minecraft client = Minecraft.getInstance();
         if (client != null) {
-            client.execute(() -> sendMessageToPlayer(Text.translatable("chat.nickpaints.sync.no_ack").formatted(Formatting.RED)));
+            client.execute(() -> sendMessageToPlayer(Component.translatable("chat.nickpaints.sync.no_ack").withStyle(ChatFormatting.RED)));
         }
     }
 
@@ -525,9 +645,15 @@ public class WebSocketManager implements WebSocket.Listener {
         boolean ok = payload.has("ok") && payload.get("ok").getAsBoolean();
         String error = payload.has("error") && !payload.get("error").isJsonNull() ? payload.get("error").getAsString() : null;
         boolean wasWaiting;
+        String pending;
+        String previous;
         synchronized (paintSyncAckLock) {
             wasWaiting = awaitingUserPaintSyncAck;
             awaitingUserPaintSyncAck = false;
+            pending = pendingPersistGradient;
+            previous = previousGradientBeforePersist;
+            pendingPersistGradient = null;
+            previousGradientBeforePersist = null;
             if (paintSyncAckTimeoutTask != null) {
                 paintSyncAckTimeoutTask.cancel(false);
                 paintSyncAckTimeoutTask = null;
@@ -536,25 +662,33 @@ public class WebSocketManager implements WebSocket.Listener {
         if (!wasWaiting) {
             return;
         }
-        MinecraftClient client = MinecraftClient.getInstance();
+        if (ok) {
+            if (pending != null) {
+                ConfigManager.CONFIG.currentGradient = pending;
+                ConfigManager.saveConfig();
+            }
+        } else if (previous != null) {
+            ConfigManager.CONFIG.currentGradient = previous;
+        }
+        Minecraft client = Minecraft.getInstance();
         if (client == null) {
             return;
         }
         client.execute(() -> {
             if (ok) {
-                sendMessageToPlayer(Text.translatable("chat.nickpaints.sync.success").formatted(Formatting.GREEN));
+                sendMessageToPlayer(Component.translatable("chat.nickpaints.sync.success").withStyle(ChatFormatting.GREEN));
             } else if ("invalid_paint".equals(error)) {
-                sendMessageToPlayer(Text.translatable("chat.nickpaints.sync.invalid_paint").formatted(Formatting.RED));
+                sendMessageToPlayer(Component.translatable("chat.nickpaints.sync.invalid_paint").withStyle(ChatFormatting.RED));
             } else {
-                sendMessageToPlayer(Text.translatable("chat.nickpaints.sync.failure", error != null ? error : "rejected").formatted(Formatting.RED));
+                sendMessageToPlayer(Component.translatable("chat.nickpaints.sync.failure", error != null ? error : "rejected").withStyle(ChatFormatting.RED));
             }
         });
     }
 
-    private static void sendMessageToPlayer(Text message) {
-        MinecraftClient client = MinecraftClient.getInstance();
+    private static void sendMessageToPlayer(Component message) {
+        Minecraft client = Minecraft.getInstance();
         if (client != null && client.player != null) {
-            client.player.sendMessage(message, false);
+            client.player.sendSystemMessage(message);
         }
     }
 }

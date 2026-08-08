@@ -1,6 +1,6 @@
 {
   "key.nickpaints.open_gui": "Открыть NickPaints",
-  "category.nickpaints.main": "NickPaints",
+  "key.category.nickpaints.main": "NickPaints",
   "chat.nickpaints.sync.success": "Пейнт успешно синхронизирован с облаком!",
   "chat.nickpaints.sync.failure": "Ошибка синхронизации: %s",
   "chat.nickpaints.sync.auth_failed": "Ошибка аутентификации. Ваша сессия может быть недействительна. Попробуйте перезапустить игру.",

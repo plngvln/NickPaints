@@ -1,12 +1,15 @@
 package net.p4pingvin4ik.NickPaints.client;
 
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.text.OrderedText;
 import org.lwjgl.glfw.GLFW;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import net.p4pingvin4ik.NickPaints.client.gui.ColorPickerPopup;
 import net.p4pingvin4ik.NickPaints.client.gui.FlatButton;
 import net.p4pingvin4ik.NickPaints.client.gui.GradientEditorState;
@@ -54,9 +57,9 @@ public class NickPaintsScreen extends Screen {
 
     private int activeTab = 0;
 
-    private final List<ClickableWidget> tabWidgets = new ArrayList<>();
+    private final List<AbstractWidget> tabWidgets = new ArrayList<>();
 
-    private TextFieldWidget playerDisableField;
+    private EditBox playerDisableField;
 
     private int colorHexFocusIndex = -1;
     private String colorHexEditBuffer = "";
@@ -95,14 +98,14 @@ public class NickPaintsScreen extends Screen {
     // ────────────────────────────────────────────────────────────────────────
 
     public NickPaintsScreen() {
-        super(Text.translatable("gui.nickpaints.title"));
+        super(Component.translatable("gui.nickpaints.title"));
     }
 
     @Override
     protected void init() {
         super.init();
 
-        for (ClickableWidget w : tabWidgets) remove(w);
+        for (AbstractWidget w : tabWidgets) removeWidget(w);
         tabWidgets.clear();
         blurColorHexEdit(false);
         colorPicker.close();
@@ -143,23 +146,23 @@ public class NickPaintsScreen extends Screen {
         int tabW = (panelW - PAD * 2 - GAP) / 2;
         int tabY = panelY + PAD;
 
-        if (tabEditorBtn  != null) remove(tabEditorBtn);
-        if (tabSettingsBtn != null) remove(tabSettingsBtn);
+        if (tabEditorBtn  != null) removeWidget(tabEditorBtn);
+        if (tabSettingsBtn != null) removeWidget(tabSettingsBtn);
 
-        tabEditorBtn = FlatButton.create(Text.translatable("gui.nickpaints.tab.editor"), b -> switchTab(0))
+        tabEditorBtn = FlatButton.create(Component.translatable("gui.nickpaints.tab.editor"), b -> switchTab(0))
                 .dimensions(panelX + PAD, tabY, tabW, TAB_H)
                 .variant(FlatButton.Variant.NORMAL)
                 .toggled(activeTab == 0)
                 .build();
 
-        tabSettingsBtn = FlatButton.create(Text.translatable("gui.nickpaints.tab.settings"), b -> switchTab(1))
+        tabSettingsBtn = FlatButton.create(Component.translatable("gui.nickpaints.tab.settings"), b -> switchTab(1))
                 .dimensions(panelX + PAD + tabW + GAP, tabY, tabW, TAB_H)
                 .variant(FlatButton.Variant.NORMAL)
                 .toggled(activeTab == 1)
                 .build();
 
-        addDrawableChild(tabEditorBtn);
-        addDrawableChild(tabSettingsBtn);
+        addRenderableWidget(tabEditorBtn);
+        addRenderableWidget(tabSettingsBtn);
     }
 
     private void switchTab(int tab) {
@@ -187,33 +190,37 @@ public class NickPaintsScreen extends Screen {
         int y2 = contentTop + 38;
 
         if (!editor.rainbowMode) {
-            IntSliderWidget spdSlider = new IntSliderWidget(col2X, y2, col2W, Text.translatable("gui.nickpaints.option.speed"), 1000, 20000, editor.speed, s -> editor.speed = s.getIntValue());
+            IntSliderWidget spdSlider = new IntSliderWidget(col2X, y2, col2W, Component.translatable("gui.nickpaints.option.speed"), 1000, 20000, editor.speed, s -> editor.speed = s.getIntValue());
             spdSlider.active = !editor.staticGradient;
             addTab(spdSlider);
             y2 += BTN_H + GAP;
 
-            IntSliderWidget segSlider = new IntSliderWidget(col2X, y2, col2W, Text.translatable("gui.nickpaints.option.segment"), 1, 200, editor.segment, s -> editor.segment = s.getIntValue());
+            IntSliderWidget segSlider = new IntSliderWidget(col2X, y2, col2W, Component.translatable("gui.nickpaints.option.segment"), 1, 200, editor.segment, s -> editor.segment = s.getIntValue());
             addTab(segSlider);
             y2 += BTN_H + GAP;
 
-            IntSliderWidget angSlider = new IntSliderWidget(col2X, y2, col2W, Text.translatable("gui.nickpaints.option.angle"), 0, 360, editor.angle, s -> editor.angle = s.getIntValue());
+            IntSliderWidget angSlider = new IntSliderWidget(col2X, y2, col2W, Component.translatable("gui.nickpaints.option.angle"), 0, 360, editor.angle, s -> editor.angle = s.getIntValue());
             addTab(angSlider);
             y2 += BTN_H + GAP * 2;
         }
 
         int hw = (col2W - GAP) / 2;
-        addTab(FlatButton.create(Text.translatable("gui.nickpaints.button.copy"),  b -> client.keyboard.setClipboard(editor.reconstructGradientString()))
+        addTab(FlatButton.create(Component.translatable("gui.nickpaints.button.copy"),  b -> minecraft.keyboardHandler.setClipboard(editor.reconstructGradientString()))
                 .dimensions(col2X, y2, hw, BTN_H).build());
-        addTab(FlatButton.create(Text.translatable("gui.nickpaints.button.paste"), b -> {
-            String clip = client.keyboard.getClipboard();
+        addTab(FlatButton.create(Component.translatable("gui.nickpaints.button.paste"), b -> {
+            String clip = minecraft.keyboardHandler.getClipboard();
             if (clip != null && !clip.isEmpty()) { editor.parseGradientString(clip.trim()); init(); }
         }).dimensions(col2X + hw + GAP, y2, hw, BTN_H).build());
         y2 += BTN_H + GAP;
 
-        addTab(FlatButton.create(Text.translatable("gui.nickpaints.button.save_sync"), b -> {
-            ConfigManager.CONFIG.currentGradient = editor.reconstructGradientString();
-            ConfigManager.saveConfig();
-            if (client.player != null) WebSocketManager.syncMyPaint();
+        addTab(FlatButton.create(Component.translatable("gui.nickpaints.button.save_sync"), b -> {
+            String newGradient = editor.reconstructGradientString();
+            if (minecraft.player != null) {
+                WebSocketManager.syncMyPaintAndPersist(newGradient);
+            } else {
+                ConfigManager.CONFIG.currentGradient = newGradient;
+                ConfigManager.saveConfig();
+            }
         }).dimensions(col2X, y2, col2W, BTN_H).variant(FlatButton.Variant.PRIMARY).build());
         y2 += BTN_H + GAP;
 
@@ -221,7 +228,7 @@ public class NickPaintsScreen extends Screen {
         presetsListTop    = y2 + 14;
         presetsListBottom = bottomActionsY - GAP;
 
-        addTab(FlatButton.create(Text.translatable("gui.nickpaints.button.save_preset"), b -> {
+        addTab(FlatButton.create(Component.translatable("gui.nickpaints.button.save_preset"), b -> {
             ConfigManager.CONFIG.presets.add(editor.reconstructGradientString());
             ConfigManager.saveConfig();
         }).dimensions(col2X, bottomActionsY, col2W, BTN_H).build());
@@ -232,7 +239,7 @@ public class NickPaintsScreen extends Screen {
 
         // Rainbow toggle
         addTab(FlatButton.create(
-                        Text.translatable("gui.nickpaints.mode.rainbow"),
+                        Component.translatable("gui.nickpaints.mode.rainbow"),
                         b -> { editor.rainbowMode = !editor.rainbowMode; init(); })
                 .dimensions(col1X, y, col1W, BTN_H)
                 .toggled(editor.rainbowMode)
@@ -240,21 +247,21 @@ public class NickPaintsScreen extends Screen {
         y += BTN_H + GAP;
 
         if (editor.rainbowMode) {
-            IntSliderWidget rSpd = new IntSliderWidget(col1X, y, col1W, Text.translatable("gui.nickpaints.option.speed"), 1000, 20000, editor.rainbowSpeed, s -> editor.rainbowSpeed = s.getIntValue());
+            IntSliderWidget rSpd = new IntSliderWidget(col1X, y, col1W, Component.translatable("gui.nickpaints.option.speed"), 1000, 20000, editor.rainbowSpeed, s -> editor.rainbowSpeed = s.getIntValue());
             addTab(rSpd);
             y += BTN_H + GAP;
             editorContentH = y - (contentTop + 38);
         } else {
             int hw = (col1W - GAP) / 2;
-            addTab(FlatButton.create(Text.translatable("gui.nickpaints.option.static"), b -> { editor.staticGradient = !editor.staticGradient; init(); })
+            addTab(FlatButton.create(Component.translatable("gui.nickpaints.option.static"), b -> { editor.staticGradient = !editor.staticGradient; init(); })
                     .dimensions(col1X, y, hw, BTN_H).toggled(editor.staticGradient).build());
-            addTab(FlatButton.create(Text.translatable("gui.nickpaints.option.style_block"), b -> { editor.blockStyle = !editor.blockStyle; init(); })
+            addTab(FlatButton.create(Component.translatable("gui.nickpaints.option.style_block"), b -> { editor.blockStyle = !editor.blockStyle; init(); })
                     .dimensions(col1X + hw + GAP, y, hw, BTN_H).toggled(editor.blockStyle).build());
             y += BTN_H + GAP * 2;
 
-            y += textRenderer.fontHeight + GAP;
+            y += font.lineHeight + GAP;
 
-            FlatButton addBtn = FlatButton.create(Text.translatable("gui.nickpaints.button.add_color"), b -> {
+            FlatButton addBtn = FlatButton.create(Component.translatable("gui.nickpaints.button.add_color"), b -> {
                 editor.colors.add(new float[]{1f, 1f, 1f});
 
                 int colorsTotal = editor.colors.size() * COLOR_ROW_STRIDE;
@@ -281,7 +288,7 @@ public class NickPaintsScreen extends Screen {
 
     /** First color row Y (scrollable list top). */
     private int editorColorsListTop() {
-        return editorColorsLabelY() + textRenderer.fontHeight + GAP;
+        return editorColorsLabelY() + font.lineHeight + GAP;
     }
 
     /** Bottom edge of the scrollable color rows (above pinned «Добавить цвет»). */
@@ -320,7 +327,7 @@ public class NickPaintsScreen extends Screen {
     }
 
     /** Swatch + hex + delete for one row; same geometry as hit-testing. */
-    private void renderEditorColorRows(DrawContext ctx, int mx, int my) {
+    private void renderEditorColorRows(GuiGraphicsExtractor ctx, int mx, int my) {
         int listTop = editorColorsListTop();
         int listBottom = editorColorsRowsBottom();
         int n = editor.colors.size();
@@ -350,10 +357,10 @@ public class NickPaintsScreen extends Screen {
             boolean hovHex = inside(fieldX, y, fieldW, 18, mx, my);
             ctx.fill(fieldX, y, fieldX + fieldW, y + 18, 0xFF0D0D0D);
             drawBorder(ctx, fieldX, y, fieldW, 18, (hexFocus || hovHex) ? C_BORDER_LIT : C_BORDER);
-            ctx.drawTextWithShadow(textRenderer, Text.literal(hexShow), fieldX + 4, y + 5, C_TEXT_PRI);
+            ctx.text(font, Component.literal(hexShow), fieldX + 4, y + 5, C_TEXT_PRI);
             if (hexFocus && (System.currentTimeMillis() / 500) % 2 == 0) {
                 int safeLen = Math.min(colorHexCursor, hexShow.length());
-                int cx = fieldX + 4 + textRenderer.getWidth(hexShow.substring(0, safeLen));
+                int cx = fieldX + 4 + font.width(hexShow.substring(0, safeLen));
                 ctx.fill(cx, y + 3, cx + 1, y + 15, 0xFFAAAAAA);
             }
 
@@ -363,7 +370,7 @@ public class NickPaintsScreen extends Screen {
                 boolean hovDel = inside(dx, dy, 30, BTN_H, mx, my);
                 ctx.fill(dx, dy, dx + 30, dy + BTN_H, hovDel ? 0xFF321A1A : 0xFF221414);
                 drawBorder(ctx, dx, dy, 30, BTN_H, hovDel ? 0xFF5A2020 : C_BORDER);
-                ctx.drawCenteredTextWithShadow(textRenderer, Text.literal("✕"), dx + 15, dy + 6, hovDel ? 0xFFCC6666 : 0xFF774444);
+                ctx.centeredText(font, Component.literal("✕"), dx + 15, dy + 6, hovDel ? 0xFFCC6666 : 0xFF774444);
             }
 
             y += COLOR_ROW_STRIDE;
@@ -422,7 +429,7 @@ public class NickPaintsScreen extends Screen {
         int x = contentLeft, y = contentTop, w = contentW;
 
         addTab(FlatButton.create(
-                        Text.translatable("gui.nickpaints.settings.global_rendering"),
+                        Component.translatable("gui.nickpaints.settings.global_rendering"),
                         b -> { ConfigManager.CONFIG.setGlobalRendering(!ConfigManager.CONFIG.globalRenderingEnabled); ConfigManager.saveConfig(); init(); })
                 .dimensions(x, y, w, BTN_H)
                 .toggled(ConfigManager.CONFIG.globalRenderingEnabled)
@@ -430,7 +437,7 @@ public class NickPaintsScreen extends Screen {
         y += BTN_H + GAP;
 
         addTab(FlatButton.create(
-                        Text.translatable("gui.nickpaints.settings.show_own_nametag"),
+                        Component.translatable("gui.nickpaints.settings.show_own_nametag"),
                         b -> { ConfigManager.CONFIG.showOwnNametag = !ConfigManager.CONFIG.showOwnNametag; ConfigManager.saveConfig(); init(); })
                 .dimensions(x, y, w, BTN_H)
                 .toggled(ConfigManager.CONFIG.showOwnNametag)
@@ -438,23 +445,23 @@ public class NickPaintsScreen extends Screen {
         y += BTN_H + GAP * 3;
 
         // Label for disable field — drawn in renderSettingsOverlay, reserve space
-        y += textRenderer.fontHeight + GAP * 2;
+        y += font.lineHeight + GAP * 2;
 
         // Disable-player row
         int fieldW = w - 90;
-        playerDisableField = new TextFieldWidget(textRenderer, x, y, fieldW, 20, Text.empty());
+        playerDisableField = new EditBox(font, x, y, fieldW, 20, Component.empty());
         playerDisableField.setMaxLength(32);
         addTab(playerDisableField);
 
-        addTab(FlatButton.create(Text.translatable("gui.nickpaints.settings.disable_button"), b -> {
-            String username = playerDisableField.getText().trim();
+        addTab(FlatButton.create(Component.translatable("gui.nickpaints.settings.disable_button"), b -> {
+            String username = playerDisableField.getValue().trim();
             if (!username.isEmpty()) {
                 MojangAPIHelper.getUuidForUsername(username).thenAccept(uuidOpt -> uuidOpt.ifPresent(raw -> {
                     UUID uuid = (UUID) raw;
-                    client.execute(() -> {
+                    minecraft.execute(() -> {
                         ConfigManager.CONFIG.setPlayerRendering(uuid, username, false);
                         ConfigManager.saveConfig();
-                        playerDisableField.setText("");
+                        playerDisableField.setValue("");
                     });
                 }));
             }
@@ -465,10 +472,10 @@ public class NickPaintsScreen extends Screen {
         suggestListBottom = y + 40;
         y = suggestListBottom + 10;
 
-        disabledListTop    = y + textRenderer.fontHeight + GAP;
+        disabledListTop    = y + font.lineHeight + GAP;
         disabledListBottom = contentBottom - 30;
 
-        addTab(FlatButton.create(Text.translatable("gui.nickpaints.settings.clear_cache_button"), b -> WebSocketManager.clearCache())
+        addTab(FlatButton.create(Component.translatable("gui.nickpaints.settings.clear_cache_button"), b -> WebSocketManager.clearCache())
                 .dimensions(x, contentBottom - BTN_H, w, BTN_H)
                 .build());
     }
@@ -478,7 +485,7 @@ public class NickPaintsScreen extends Screen {
     // ─────────────────────────────────────────────────────────────────────────
 
     @Override
-    public void render(DrawContext ctx, int mx, int my, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor ctx, int mx, int my, float delta) {
         // Dim
         ctx.fill(0, 0, width, height, C_OVERLAY);
 
@@ -492,29 +499,29 @@ public class NickPaintsScreen extends Screen {
         ctx.fill(panelX + 1, sepY, panelX + panelW - 1, sepY + 1, C_BORDER);
 
         // MC-rendered widgets (tabs + tab content)
-        super.render(ctx, mx, my, delta);
+        super.extractRenderState(ctx, mx, my, delta);
 
         // Tab-specific overlays
         if (activeTab == 0) renderEditorOverlay(ctx, mx, my);
         else                renderSettingsOverlay(ctx, mx, my);
 
         // Color picker on top
-        colorPicker.render(ctx, textRenderer, mx, my);
+        colorPicker.render(ctx, font, mx, my);
 
         // Tutorial on very top
         if (tutorialActive) renderTutorial(ctx, mx, my);
     }
 
-    private void renderEditorOverlay(DrawContext ctx, int mx, int my) {
-        String name = client.player != null ? client.player.getName().getString() : "Preview";
+    private void renderEditorOverlay(GuiGraphicsExtractor ctx, int mx, int my) {
+        String name = minecraft.player != null ? minecraft.player.getName().getString() : "Preview";
         String grad = editor.reconstructGradientString();
 
-        GradientPreviewRenderer.drawPreview(ctx, textRenderer, contentLeft, contentTop + 6, contentW, grad, name, true);
+        GradientPreviewRenderer.drawPreview(ctx, font, contentLeft, contentTop + 6, contentW, grad, name, true);
 
         int len = grad.length();
         String lenStr = len + " / 256";
         int lenColor  = len > 230 ? 0xFF886666 : C_TEXT_HINT;
-        ctx.drawTextWithShadow(textRenderer, Text.literal(lenStr), contentLeft + contentW - textRenderer.getWidth(lenStr), contentTop + 20, lenColor);
+        ctx.text(font, Component.literal(lenStr), contentLeft + contentW - font.width(lenStr), contentTop + 20, lenColor);
 
         if (!editor.rainbowMode) {
             int labelY = editorColorsLabelY();
@@ -522,7 +529,7 @@ public class NickPaintsScreen extends Screen {
             int colorsAreaBottom = editorColorsRowsBottom();
             int addStripTop      = colorsAreaBottom;
 
-            drawSectionLabel(ctx, Text.translatable("gui.nickpaints.section.colors").getString(), col1X, labelY);
+            drawSectionLabel(ctx, Component.translatable("gui.nickpaints.section.colors").getString(), col1X, labelY);
 
             ctx.fill(col1X, colorsAreaTop, col1X + col1W, colorsAreaBottom, 0x28000000);
             drawBorder(ctx, col1X, colorsAreaTop, col1W, colorsAreaBottom - colorsAreaTop, C_BORDER);
@@ -540,20 +547,20 @@ public class NickPaintsScreen extends Screen {
             }
         }
 
-        drawSectionLabel(ctx, Text.translatable("gui.nickpaints.button.save_preset").getString(), col2X, presetsListTop - textRenderer.fontHeight - GAP);
+        drawSectionLabel(ctx, Component.translatable("gui.nickpaints.button.save_preset").getString(), col2X, presetsListTop - font.lineHeight - GAP);
         renderPresetsList(ctx, mx, my);
     }
 
-    private void renderSettingsOverlay(DrawContext ctx, int mx, int my) {
+    private void renderSettingsOverlay(GuiGraphicsExtractor ctx, int mx, int my) {
         // Label above disable field — positioned to match widget Y in buildSettingsWidgets
         // two toggles + GAP*3 + fontHeight + GAP*2 = label baseline
         int labelY = contentTop + (BTN_H + GAP) + (BTN_H + GAP * 3) + GAP;
-        ctx.drawTextWithShadow(textRenderer, Text.translatable("gui.nickpaints.settings.disable_player_label"), contentLeft, labelY, C_TEXT_SEC);
+        ctx.text(font, Component.translatable("gui.nickpaints.settings.disable_player_label"), contentLeft, labelY, C_TEXT_SEC);
 
         renderSuggestionsList(ctx, mx, my);
 
         // Disabled list header
-        drawSectionLabel(ctx, Text.translatable("gui.nickpaints.settings.disabled_list").getString(), contentLeft, disabledListTop - textRenderer.fontHeight - GAP);
+        drawSectionLabel(ctx, Component.translatable("gui.nickpaints.settings.disabled_list").getString(), contentLeft, disabledListTop - font.lineHeight - GAP);
         renderDisabledList(ctx, mx, my);
     }
 
@@ -561,15 +568,15 @@ public class NickPaintsScreen extends Screen {
     // LIST RENDERERS
     // ─────────────────────────────────────────────────────────────────────────
 
-    private void renderPresetsList(DrawContext ctx, int mx, int my) {
+    private void renderPresetsList(GuiGraphicsExtractor ctx, int mx, int my) {
         List<String> presets = ConfigManager.CONFIG.presets;
         if (presets.isEmpty()) {
-            ctx.drawTextWithShadow(textRenderer, Text.literal("—"), col2X, presetsListTop + 4, C_TEXT_HINT);
+            ctx.text(font, Component.literal("—"), col2X, presetsListTop + 4, C_TEXT_HINT);
             return;
         }
         ctx.enableScissor(col2X, presetsListTop, col2X + col2W, presetsListBottom);
         int y = presetsListTop - presetsScroll;
-        String pname = client.player != null ? client.player.getName().getString() : "Preview";
+        String pname = minecraft.player != null ? minecraft.player.getName().getString() : "Preview";
 
         for (int i = 0; i < presets.size(); i++) {
             if (y + ROW_PRE < presetsListTop) { y += ROW_PRE; continue; }
@@ -580,12 +587,12 @@ public class NickPaintsScreen extends Screen {
 
             ctx.fill(col2X, y, col2X + col2W - 22, y + ROW_PRE - 1, hovRow ? C_ELEVATED : C_SURFACE);
             drawBorder(ctx, col2X, y, col2W - 22, ROW_PRE - 1, hovRow ? C_BORDER_LIT : C_BORDER);
-            GradientPreviewRenderer.drawPreview(ctx, textRenderer, col2X + 4, y + 4, col2W - 30, presets.get(i), pname, false);
+            GradientPreviewRenderer.drawPreview(ctx, font, col2X + 4, y + 4, col2W - 30, presets.get(i), pname, false);
 
             // Del button
             ctx.fill(col2X + col2W - 20, y, col2X + col2W, y + ROW_PRE - 1, hovDel ? 0xFF2E1010 : 0xFF1A0A0A);
             drawBorder(ctx, col2X + col2W - 20, y, 20, ROW_PRE - 1, hovDel ? 0xFF5A2020 : C_BORDER);
-            ctx.drawCenteredTextWithShadow(textRenderer, Text.literal("✕"), col2X + col2W - 10, y + 3, hovDel ? 0xFFCC6666 : 0xFF774444);
+            ctx.centeredText(font, Component.literal("✕"), col2X + col2W - 10, y + 3, hovDel ? 0xFFCC6666 : 0xFF774444);
 
             y += ROW_PRE;
         }
@@ -597,14 +604,14 @@ public class NickPaintsScreen extends Screen {
         if (total > visible) drawScrollBar(ctx, col2X + col2W + 2, presetsListTop, 3, visible, presetsScroll, total);
     }
 
-    private void renderSuggestionsList(DrawContext ctx, int mx, int my) {
-        if (playerDisableField == null || client.getNetworkHandler() == null || client.player == null) return;
-        String input = playerDisableField.getText().toLowerCase();
+    private void renderSuggestionsList(GuiGraphicsExtractor ctx, int mx, int my) {
+        if (playerDisableField == null || minecraft.getConnection() == null || minecraft.player == null) return;
+        String input = playerDisableField.getValue().toLowerCase();
         if (input.isEmpty()) return;
 
-        List<String> sugg = client.getNetworkHandler().getPlayerList().stream()
-                .map(e -> e.getProfile().getName())
-                .filter(n -> !n.equalsIgnoreCase(client.player.getName().getString()))
+        List<String> sugg = minecraft.getConnection().getOnlinePlayers().stream()
+                .map(e -> e.getProfile().name())
+                .filter(n -> !n.equalsIgnoreCase(minecraft.player.getName().getString()))
                 .filter(n -> n.toLowerCase().startsWith(input))
                 .filter(n -> !ConfigManager.CONFIG.disabledPlayers.containsValue(n))
                 .collect(Collectors.toList());
@@ -619,15 +626,15 @@ public class NickPaintsScreen extends Screen {
             boolean hov = inside(contentLeft, y, contentW, ROW_SUG, mx, my);
             ctx.fill(contentLeft, y, contentLeft + contentW, y + ROW_SUG, hov ? C_ELEVATED : C_SURFACE);
             drawBorder(ctx, contentLeft, y, contentW, ROW_SUG, C_BORDER);
-            ctx.drawTextWithShadow(textRenderer, Text.literal(s), contentLeft + 6, y + 5, C_TEXT_PRI);
+            ctx.text(font, Component.literal(s), contentLeft + 6, y + 5, C_TEXT_PRI);
             y += ROW_SUG;
         }
         ctx.disableScissor();
     }
 
-    private void renderDisabledList(DrawContext ctx, int mx, int my) {
+    private void renderDisabledList(GuiGraphicsExtractor ctx, int mx, int my) {
         if (ConfigManager.CONFIG.disabledPlayers.isEmpty()) {
-            ctx.drawTextWithShadow(textRenderer, Text.translatable("gui.nickpaints.settings.none"), contentLeft, disabledListTop + 4, C_TEXT_HINT);
+            ctx.text(font, Component.translatable("gui.nickpaints.settings.none"), contentLeft, disabledListTop + 4, C_TEXT_HINT);
             return;
         }
         ctx.enableScissor(contentLeft, disabledListTop, contentLeft + contentW, disabledListBottom);
@@ -638,8 +645,8 @@ public class NickPaintsScreen extends Screen {
             boolean hov = inside(contentLeft, y, 72, ROW_DIS - 2, mx, my);
             ctx.fill(contentLeft, y, contentLeft + 72, y + ROW_DIS - 2, hov ? C_ELEVATED : C_SURFACE);
             drawBorder(ctx, contentLeft, y, 72, ROW_DIS - 2, hov ? C_BORDER_LIT : C_BORDER);
-            ctx.drawCenteredTextWithShadow(textRenderer, Text.translatable("gui.nickpaints.settings.reenable_button"), contentLeft + 36, y + 5, hov ? C_TEXT_PRI : C_TEXT_SEC);
-            ctx.drawTextWithShadow(textRenderer, Text.literal(e.getValue()), contentLeft + 80, y + 5, C_TEXT_SEC);
+            ctx.centeredText(font, Component.translatable("gui.nickpaints.settings.reenable_button"), contentLeft + 36, y + 5, hov ? C_TEXT_PRI : C_TEXT_SEC);
+            ctx.text(font, Component.literal(e.getValue()), contentLeft + 80, y + 5, C_TEXT_SEC);
             y += ROW_DIS;
         }
         ctx.disableScissor();
@@ -668,7 +675,7 @@ public class NickPaintsScreen extends Screen {
     };
     private static final int TUTORIAL_STEPS = 4;
 
-    private void renderTutorial(DrawContext ctx, int mx, int my) {
+    private void renderTutorial(GuiGraphicsExtractor ctx, int mx, int my) {
         ctx.fill(0, 0, width, height, 0xBB000000);
 
         int tw = 340, th = 180;
@@ -683,38 +690,38 @@ public class NickPaintsScreen extends Screen {
 
         // Step indicator
         String stepStr = (tutorialStep + 1) + " / " + TUTORIAL_STEPS;
-        ctx.drawTextWithShadow(textRenderer, Text.literal(stepStr), tx + tw - textRenderer.getWidth(stepStr) - 8, ty + 8, C_TEXT_HINT);
+        ctx.text(font, Component.literal(stepStr), tx + tw - font.width(stepStr) - 8, ty + 8, C_TEXT_HINT);
 
         // Title
-        ctx.drawCenteredTextWithShadow(textRenderer, Text.translatable(TUTORIAL_TITLE_KEYS[tutorialStep]), tx + tw / 2, ty + 10, C_TEXT_PRI);
+        ctx.centeredText(font, Component.translatable(TUTORIAL_TITLE_KEYS[tutorialStep]), tx + tw / 2, ty + 10, C_TEXT_PRI);
         ctx.fill(tx + 16, ty + 22, tx + tw - 16, ty + 23, C_BORDER);
 
         // Body
-        Text body = Text.translatable(TUTORIAL_BODY_KEYS[tutorialStep]);
+        Component body = Component.translatable(TUTORIAL_BODY_KEYS[tutorialStep]);
         int ly = ty + 30;
-        for (OrderedText line : textRenderer.wrapLines(body, tw - 32)) {
-            ctx.drawTextWithShadow(textRenderer, line, tx + 16, ly, C_TEXT_SEC);
-            ly += textRenderer.fontHeight + 2;
+        for (FormattedCharSequence line : font.split(body, tw - 32)) {
+            ctx.text(font, line, tx + 16, ly, C_TEXT_SEC);
+            ly += font.lineHeight + 2;
         }
 
         // Buttons
         int bw = 90, by = ty + th - 30;
-        drawInlineBtn(ctx, Text.translatable("gui.nickpaints.tutorial.button.skip").getString(),
+        drawInlineBtn(ctx, Component.translatable("gui.nickpaints.tutorial.button.skip").getString(),
                 tx + 12, by, bw, 22, mx, my, false);
         String nextKey = tutorialStep == TUTORIAL_STEPS - 1
                 ? "gui.nickpaints.tutorial.button.finish"
                 : "gui.nickpaints.tutorial.button.next";
-        drawInlineBtn(ctx, Text.translatable(nextKey).getString(),
+        drawInlineBtn(ctx, Component.translatable(nextKey).getString(),
                 tx + tw - bw - 12, by, bw, 22, mx, my, true);
     }
 
-    private void drawInlineBtn(DrawContext ctx, String label, int x, int y, int w, int h, int mx, int my, boolean primary) {
+    private void drawInlineBtn(GuiGraphicsExtractor ctx, String label, int x, int y, int w, int h, int mx, int my, boolean primary) {
         boolean hov = inside(x, y, w, h, mx, my);
         int bg     = primary ? (hov ? 0xFF303030 : 0xFF242424) : (hov ? 0xFF222222 : 0xFF181818);
         int border = primary ? (hov ? C_BORDER_LIT : C_BORDER) : C_BORDER;
         ctx.fill(x, y, x + w, y + h, bg);
         drawBorder(ctx, x, y, w, h, border);
-        ctx.drawCenteredTextWithShadow(textRenderer, Text.literal(label), x + w / 2, y + (h - 8) / 2, primary ? C_TEXT_PRI : C_TEXT_SEC);
+        ctx.centeredText(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, primary ? C_TEXT_PRI : C_TEXT_SEC);
     }
 
     private void finishTutorial() {
@@ -728,7 +735,10 @@ public class NickPaintsScreen extends Screen {
     // ─────────────────────────────────────────────────────────────────────────
 
     @Override
-    public boolean mouseClicked(double mx, double my, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mx = event.x();
+        double my = event.y();
+        int button = event.button();
         // Color picker eats input first
         if (colorPicker.isVisible()) {
             if (colorPicker.mouseClicked(mx, my, button)) return true;
@@ -778,17 +788,17 @@ public class NickPaintsScreen extends Screen {
             }
         } else {
             // Suggestion clicks
-            if (playerDisableField != null && client.getNetworkHandler() != null && client.player != null) {
-                String input = playerDisableField.getText().toLowerCase();
+            if (playerDisableField != null && minecraft.getConnection() != null && minecraft.player != null) {
+                String input = playerDisableField.getValue().toLowerCase();
                 if (!input.isEmpty()) {
-                    List<String> sugg = client.getNetworkHandler().getPlayerList().stream()
-                            .map(e -> e.getProfile().getName())
+                    List<String> sugg = minecraft.getConnection().getOnlinePlayers().stream()
+                            .map(e -> e.getProfile().name())
                             .filter(n -> n.toLowerCase().startsWith(input))
                             .collect(Collectors.toList());
                     int y = suggestListTop - suggestScroll;
                     for (String s : sugg) {
                         if (inside(contentLeft, y, contentW, ROW_SUG, (int)mx, (int)my)) {
-                            playerDisableField.setText(s);
+                            playerDisableField.setValue(s);
                             return true;
                         }
                         y += ROW_SUG;
@@ -809,19 +819,19 @@ public class NickPaintsScreen extends Screen {
             }
         }
 
-        return super.mouseClicked(mx, my, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override
-    public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
-        if (colorPicker.isVisible() && colorPicker.mouseDragged(mx, my, button, dx, dy)) return true;
-        return super.mouseDragged(mx, my, button, dx, dy);
+    public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+        if (colorPicker.isVisible() && colorPicker.mouseDragged(event.x(), event.y(), event.button(), dx, dy)) return true;
+        return super.mouseDragged(event, dx, dy);
     }
 
     @Override
-    public boolean mouseReleased(double mx, double my, int button) {
-        colorPicker.mouseReleased(mx, my, button);
-        return super.mouseReleased(mx, my, button);
+    public boolean mouseReleased(MouseButtonEvent event) {
+        colorPicker.mouseReleased(event.x(), event.y(), event.button());
+        return super.mouseReleased(event);
     }
 
     @Override
@@ -868,8 +878,9 @@ public class NickPaintsScreen extends Screen {
     }
 
     @Override
-    public boolean charTyped(char chr, int modifiers) {
-        if (colorPicker.isVisible() && colorPicker.charTyped(chr, modifiers)) return true;
+    public boolean charTyped(CharacterEvent event) {
+        char chr = event.codepointAsString().charAt(0);
+        if (colorPicker.isVisible() && colorPicker.charTyped(chr, 0)) return true;
         if (activeTab == 0 && !editor.rainbowMode && colorHexFocusIndex >= 0) {
             if (colorHexEditBuffer.length() < 7 && isHexInputChar(chr)) {
                 colorHexEditBuffer = colorHexEditBuffer.substring(0, colorHexCursor) + chr + colorHexEditBuffer.substring(colorHexCursor);
@@ -880,36 +891,36 @@ public class NickPaintsScreen extends Screen {
                 return true;
             }
         }
-        return super.charTyped(chr, modifiers);
+        return super.charTyped(event);
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (colorPicker.isVisible() && colorPicker.keyPressed(keyCode, scanCode, modifiers)) return true;
+    public boolean keyPressed(KeyEvent event) {
+        if (colorPicker.isVisible() && colorPicker.keyPressed(event.key(), event.scancode(), event.modifiers())) return true;
         if (activeTab == 0 && !editor.rainbowMode && colorHexFocusIndex >= 0) {
-            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
                 blurColorHexEdit(false);
                 return true;
             }
-            if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+            if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER) {
                 blurColorHexEdit(true);
                 return true;
             }
-            if (keyCode == GLFW.GLFW_KEY_BACKSPACE && colorHexCursor > 1) {
+            if (event.key() == GLFW.GLFW_KEY_BACKSPACE && colorHexCursor > 1) {
                 colorHexEditBuffer = colorHexEditBuffer.substring(0, colorHexCursor - 1) + colorHexEditBuffer.substring(colorHexCursor);
                 colorHexCursor--;
                 return true;
             }
-            if (keyCode == GLFW.GLFW_KEY_RIGHT && colorHexCursor < colorHexEditBuffer.length()) {
+            if (event.key() == GLFW.GLFW_KEY_RIGHT && colorHexCursor < colorHexEditBuffer.length()) {
                 colorHexCursor++;
                 return true;
             }
-            if (keyCode == GLFW.GLFW_KEY_LEFT && colorHexCursor > 0) {
+            if (event.key() == GLFW.GLFW_KEY_LEFT && colorHexCursor > 0) {
                 colorHexCursor--;
                 return true;
             }
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(event);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -917,8 +928,8 @@ public class NickPaintsScreen extends Screen {
     // ─────────────────────────────────────────────────────────────────────────
 
     @Override
-    public void renderBackground(DrawContext ctx, int mx, int my, float delta) {
-        // intentionally empty — our own overlay is drawn in render()
+    public void extractBackground(GuiGraphicsExtractor ctx, int mx, int my, float delta) {
+        // intentionally empty — our own overlay is drawn in extractRenderState()
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -953,8 +964,8 @@ public class NickPaintsScreen extends Screen {
     // UTILITIES
     // ─────────────────────────────────────────────────────────────────────────
 
-    private void addTab(ClickableWidget w) {
-        addDrawableChild(w);
+    private void addTab(AbstractWidget w) {
+        addRenderableWidget(w);
         tabWidgets.add(w);
     }
 
@@ -968,12 +979,12 @@ public class NickPaintsScreen extends Screen {
         } catch (Exception ignored) {}
     }
 
-    private void drawSectionLabel(DrawContext ctx, String text, int x, int y) {
-        ctx.drawTextWithShadow(textRenderer, Text.literal(text), x, y, C_TEXT_HINT);
-        ctx.fill(x, y + textRenderer.fontHeight + 1, x + textRenderer.getWidth(text), y + textRenderer.fontHeight + 2, C_BORDER);
+    private void drawSectionLabel(GuiGraphicsExtractor ctx, String text, int x, int y) {
+        ctx.text(font, Component.literal(text), x, y, C_TEXT_HINT);
+        ctx.fill(x, y + font.lineHeight + 1, x + font.width(text), y + font.lineHeight + 2, C_BORDER);
     }
 
-    private void drawScrollBar(DrawContext ctx, int x, int listTop, int barW, int visibleH, int scroll, int totalH) {
+    private void drawScrollBar(GuiGraphicsExtractor ctx, int x, int listTop, int barW, int visibleH, int scroll, int totalH) {
         if (totalH <= visibleH) return;
         float ratio    = (float) visibleH / totalH;
         int   thumbH   = Math.max(14, (int)(visibleH * ratio));
@@ -984,7 +995,7 @@ public class NickPaintsScreen extends Screen {
         ctx.fill(x + 1, thumbY + 1, x + barW - 1, thumbY + 2, 0xFF909090);
     }
 
-    private static void drawBorder(DrawContext ctx, int x, int y, int w, int h, int color) {
+    private static void drawBorder(GuiGraphicsExtractor ctx, int x, int y, int w, int h, int color) {
         ctx.fill(x,         y,       x + w,   y + 1,   color);
         ctx.fill(x,         y + h-1, x + w,   y + h,   color);
         ctx.fill(x,         y,       x + 1,   y + h,   color);

@@ -1,17 +1,18 @@
 package net.p4pingvin4ik.NickPaints.client;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.InputUtil;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.HoverEvent;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.resources.Identifier;
+import net.minecraft.sounds.SoundEvents;
 import net.p4pingvin4ik.NickPaints.client.commands.NickPaintsCommands;
 import net.p4pingvin4ik.NickPaints.config.ConfigManager;
 import org.lwjgl.glfw.GLFW;
@@ -24,7 +25,11 @@ public class NickPaintsMod implements ClientModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     public static final String PROTECTED_TAG_INSERTION_KEY = "NICKPAINTS_PROTECTED_V1";
 
-    private static KeyBinding keyBinding;
+    public static final KeyMapping.Category KEY_CATEGORY = KeyMapping.Category.register(
+            Identifier.fromNamespaceAndPath(MOD_ID, "main")
+    );
+
+    private static KeyMapping keyBinding;
 
     static {Runtime.getRuntime().addShutdownHook(new Thread(WebSocketManager::disconnect));}
 
@@ -38,11 +43,16 @@ public class NickPaintsMod implements ClientModInitializer {
             LOGGER.info("initializing NickPaints...");
         });
 
-        keyBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.nickpaints.open_gui", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_MINUS, "category.nickpaints.main"));
+        keyBinding = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+                "key.nickpaints.open_gui",
+                InputConstants.Type.KEYSYM,
+                GLFW.GLFW_KEY_MINUS,
+                KEY_CATEGORY
+        ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (keyBinding.wasPressed()) {
-                client.setScreen(new NickPaintsScreen());
+            if (keyBinding.consumeClick()) {
+                client.gui.setScreen(new NickPaintsScreen());
             }
             WebSocketManager.updateVisiblePlayers();
         });
@@ -56,8 +66,10 @@ public class NickPaintsMod implements ClientModInitializer {
                         Thread.sleep(1500);
                         client.execute(() -> {
                             if (client.player != null) {
-                                client.player.playSound(SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME);
-                                client.player.sendMessage(createWelcomeMessage(), false);
+                                client.player.playSound(SoundEvents.AMETHYST_BLOCK_CHIME, 1.0f, 1.0f);
+                                client.player.sendSystemMessage(createWelcomeMessage());
+                                ConfigManager.CONFIG.hasShownWelcomeMessage = true;
+                                ConfigManager.saveConfig();
                             }
                         });
                     } catch (InterruptedException e) {
@@ -66,20 +78,23 @@ public class NickPaintsMod implements ClientModInitializer {
                 }).start();
             }
         });
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            WebSocketManager.onWorldDisconnect();
+        });
         LOGGER.info("NickPaints Mod initialized.");
     }
 
-    private Text createWelcomeMessage() {
-        return Text.literal("[NickPaints] ").formatted(Formatting.AQUA)
-                .append(Text.translatable("chat.nickpaints.welcome.main").formatted(Formatting.WHITE))
+    private Component createWelcomeMessage() {
+        return Component.literal("[NickPaints] ").withStyle(ChatFormatting.AQUA)
+                .append(Component.translatable("chat.nickpaints.welcome.main").withStyle(ChatFormatting.WHITE))
                 .append(" ")
-                .append(Text.translatable("chat.nickpaints.welcome.click")
-                        .formatted(Formatting.YELLOW, Formatting.BOLD)
-                        .styled(style -> style
+                .append(Component.translatable("chat.nickpaints.welcome.click")
+                        .withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD)
+                        .withStyle(style -> style
                                 .withClickEvent(new ClickEvent.RunCommand("/nickpaints"))
-                                .withHoverEvent(new HoverEvent.ShowText(Text.translatable("chat.nickpaints.welcome.hover")))
+                                .withHoverEvent(new HoverEvent.ShowText(Component.translatable("chat.nickpaints.welcome.hover")))
                         )
                 )
-                .append(Text.literal(".").formatted(Formatting.GRAY));
+                .append(Component.literal(".").withStyle(ChatFormatting.GRAY));
     }
 }

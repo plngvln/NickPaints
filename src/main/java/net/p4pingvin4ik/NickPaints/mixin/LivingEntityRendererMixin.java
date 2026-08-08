@@ -1,8 +1,8 @@
 package net.p4pingvin4ik.NickPaints.mixin;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.entity.LivingEntityRenderer;
-import net.minecraft.entity.LivingEntity;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.world.entity.LivingEntity;
 import net.p4pingvin4ik.NickPaints.config.ConfigManager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -13,24 +13,18 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class LivingEntityRendererMixin {
 
     /**
-     * @reason To force the game to draw the local player's own nametag in third-person view.
-     * By default, Minecraft's rendering logic in hasLabel() hides the nametag for the player entity
-     * that matches the client's player. This mixin intercepts that check.
+     * Force the local player's own nametag in third-person view only.
+     * Vanilla hides it when the entity is the camera entity.
      */
-    @Inject(method = "hasLabel(Lnet/minecraft/entity/LivingEntity;D)Z", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "shouldShowName(Lnet/minecraft/world/entity/LivingEntity;D)Z", at = @At("HEAD"), cancellable = true)
     private void showOwnNametag(LivingEntity livingEntity, double d, CallbackInfoReturnable<Boolean> cir) {
         if (!ConfigManager.CONFIG.showOwnNametag) {
             return;
         }
 
-        MinecraftClient client = MinecraftClient.getInstance();
-
-        // Check if the entity being rendered is the client's own player character.
-        if (livingEntity == client.player) {
-            // If it is, we bypass the original method's logic and return our own value.
-            // We still respect the vanilla HUD visibility setting (F1) and ensure the player is not a passenger.
-            // This makes the local player's nametag visible, allowing our other mixins to apply the custom paint.
-            cir.setReturnValue(MinecraftClient.isHudEnabled() && !livingEntity.hasPassengers());
+        Minecraft client = Minecraft.getInstance();
+        if (livingEntity == client.player && !client.options.getCameraType().isFirstPerson()) {
+            cir.setReturnValue(!client.gui.hud.isHidden() && !livingEntity.isVehicle());
         }
     }
 }

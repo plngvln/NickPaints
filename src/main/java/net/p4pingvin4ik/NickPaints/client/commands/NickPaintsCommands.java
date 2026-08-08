@@ -6,11 +6,12 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.command.CommandRegistryAccess;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.network.chat.Component;
 import net.p4pingvin4ik.NickPaints.client.NickPaintsScreen;
 import net.p4pingvin4ik.NickPaints.client.MojangAPIHelper;
 import net.p4pingvin4ik.NickPaints.client.WebSocketManager;
@@ -19,8 +20,8 @@ import net.p4pingvin4ik.NickPaints.config.ConfigManager;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument;
-import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
+import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.argument;
+import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
 
 public class NickPaintsCommands {
 
@@ -28,18 +29,18 @@ public class NickPaintsCommands {
         ClientCommandRegistrationCallback.EVENT.register(NickPaintsCommands::registerCommands);
     }
 
-    private static void registerCommands(CommandDispatcher<FabricClientCommandSource> dispatcher, CommandRegistryAccess registryAccess) {
+    private static void registerCommands(CommandDispatcher<FabricClientCommandSource> dispatcher, CommandBuildContext registryAccess) {
         dispatcher.register(literal("nickpaints")
                 .executes(context -> {
-                    MinecraftClient.getInstance().execute(() -> {
-                        MinecraftClient.getInstance().setScreen(new NickPaintsScreen());
+                    Minecraft.getInstance().execute(() -> {
+                        Minecraft.getInstance().gui.setScreen(new NickPaintsScreen());
                     });
                     return 1;
                 })
                 .then(literal("clear-cache")
                         .executes(context -> {
                             WebSocketManager.clearCache();
-                            context.getSource().sendFeedback(Text.literal("NickPaints cache cleared. Nicknames will be re-fetched."));
+                            context.getSource().sendFeedback(Component.literal("NickPaints cache cleared. Nicknames will be re-fetched."));
                             return 1;
                         })
                 )
@@ -81,18 +82,18 @@ public class NickPaintsCommands {
                         )
                         .then(literal("list")
                                 .executes(context -> {
-                                    context.getSource().sendFeedback(Text.literal("--- NickPaints Settings ---").formatted(Formatting.YELLOW));
-                                    Text globalStatus = Text.literal("Global Rendering: ")
-                                            .append(ConfigManager.CONFIG.globalRenderingEnabled ? Text.literal("ENABLED").formatted(Formatting.GREEN) : Text.literal("DISABLED").formatted(Formatting.RED));
+                                    context.getSource().sendFeedback(Component.literal("--- NickPaints Settings ---").withStyle(ChatFormatting.YELLOW));
+                                    Component globalStatus = Component.literal("Global Rendering: ")
+                                            .append(ConfigManager.CONFIG.globalRenderingEnabled ? Component.literal("ENABLED").withStyle(ChatFormatting.GREEN) : Component.literal("DISABLED").withStyle(ChatFormatting.RED));
                                     context.getSource().sendFeedback(globalStatus);
-                                    context.getSource().sendFeedback(Text.literal("Disabled players:").formatted(Formatting.YELLOW));
+                                    context.getSource().sendFeedback(Component.literal("Disabled players:").withStyle(ChatFormatting.YELLOW));
                                     if (ConfigManager.CONFIG.disabledPlayers.isEmpty()) {
-                                        context.getSource().sendFeedback(Text.literal("  None").formatted(Formatting.GRAY));
+                                        context.getSource().sendFeedback(Component.literal("  None").withStyle(ChatFormatting.GRAY));
                                     } else {
                                         ConfigManager.CONFIG.disabledPlayers.forEach((uuid, name) -> {
                                             context.getSource().sendFeedback(
-                                                    Text.literal("  - " + name).formatted(Formatting.GRAY)
-                                                            .append(Text.literal(" (" + uuid.toString() + ")").formatted(Formatting.DARK_GRAY))
+                                                    Component.literal("  - " + name).withStyle(ChatFormatting.GRAY)
+                                                            .append(Component.literal(" (" + uuid.toString() + ")").withStyle(ChatFormatting.DARK_GRAY))
                                             );
                                         });
                                     }
@@ -105,7 +106,7 @@ public class NickPaintsCommands {
 
     private static CompletableFuture<Suggestions> getPlayerSuggestions(com.mojang.brigadier.context.CommandContext<FabricClientCommandSource> context, SuggestionsBuilder builder) {
         String input = builder.getRemaining().toLowerCase();
-        context.getSource().getPlayerNames().stream()
+        context.getSource().getOnlinePlayerNames().stream()
                 .filter(name -> name.toLowerCase().startsWith(input))
                 .forEach(builder::suggest);
         ConfigManager.CONFIG.getDisabledPlayerNames().stream()
@@ -115,11 +116,11 @@ public class NickPaintsCommands {
     }
 
     private static void togglePlayerSetting(FabricClientCommandSource source, String username, Boolean enabledState) {
-        source.sendFeedback(Text.literal("Resolving " + username + "...").formatted(Formatting.GRAY));
+        source.sendFeedback(Component.literal("Resolving " + username + "...").withStyle(ChatFormatting.GRAY));
         MojangAPIHelper.getUuidForUsername(username).thenAccept(uuidOptional -> {
             source.getClient().execute(() -> {
                 if (uuidOptional.isEmpty()) {
-                    source.sendError(Text.literal("Player '" + username + "' not found via Mojang API."));
+                    source.sendError(Component.literal("Player '" + username + "' not found via Mojang API."));
                     return;
                 }
                 UUID playerUuid = (UUID) uuidOptional.get();
@@ -136,9 +137,9 @@ public class NickPaintsCommands {
     }
 
     private static void sendToggleFeedback(FabricClientCommandSource source, String action, boolean enabled) {
-        Text status = enabled
-                ? Text.literal("ENABLED").formatted(Formatting.GREEN)
-                : Text.literal("DISABLED").formatted(Formatting.RED);
-        source.sendFeedback(Text.literal(action + " set to ").append(status));
+        Component status = enabled
+                ? Component.literal("ENABLED").withStyle(ChatFormatting.GREEN)
+                : Component.literal("DISABLED").withStyle(ChatFormatting.RED);
+        source.sendFeedback(Component.literal(action + " set to ").append(status));
     }
 }

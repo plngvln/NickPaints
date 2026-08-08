@@ -1,9 +1,8 @@
 package net.p4pingvin4ik.NickPaints.client.gui;
 
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.Text;
-
 import java.util.function.Consumer;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.network.chat.Component;
 
 /**
  * Inline color palette popup.
@@ -131,7 +130,7 @@ public class ColorPickerPopup {
 
     // ── Rendering ─────────────────────────────────────────────────────────────
 
-    public void render(DrawContext ctx, net.minecraft.client.font.TextRenderer tr, int mx, int my) {
+    public void render(GuiGraphicsExtractor ctx, net.minecraft.client.gui.Font tr, int mx, int my) {
         if (!visible) return;
         int x = popX, y = popY;
 
@@ -173,37 +172,46 @@ public class ColorPickerPopup {
         int fy = y + SV + 6;
         ctx.fill(x + 2, fy, x + W - 2, fy + 14, 0xFF0D0D0D);
         drawBorder(ctx, x + 2, fy, W - 4, 14, hexFocused ? 0xFF666666 : 0xFF333333);
-        ctx.drawTextWithShadow(tr, Text.literal(hexInput), x + 6, fy + 3, 0xFFDDDDDD);
+        ctx.text(tr, Component.literal(hexInput), x + 6, fy + 3, 0xFFDDDDDD);
         // Cursor blink
         if (hexFocused && (System.currentTimeMillis() / 500) % 2 == 0) {
-            int cursorX = x + 6 + tr.getWidth(hexInput.substring(0, hexCursor));
+            int cursorX = x + 6 + tr.width(hexInput.substring(0, hexCursor));
             ctx.fill(cursorX, fy + 2, cursorX + 1, fy + 12, 0xFFAAAAAA);
         }
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
 
-    private void drawSVSquare(DrawContext ctx, int x, int y, int w, int h) {
+    /**
+     * SV square: saturation → X, value → Y.
+     * RGB scales linearly with V, so each column is a cheap vertical fillGradient
+     * instead of thousands of per-pixel fills every frame.
+     */
+    private void drawSVSquare(GuiGraphicsExtractor ctx, int x, int y, int w, int h) {
         int step = 2;
         for (int px = 0; px < w; px += step) {
-            float s = (float) px / (w - 1);
-            for (int py = 0; py < h; py += step) {
-                float v = 1f - (float) py / (h - 1);
-                float[] rgb = hsvToRgb(hue, s, v);
-                int c = 0xFF000000 | ((int)(rgb[0]*255) << 16) | ((int)(rgb[1]*255) << 8) | (int)(rgb[2]*255);
-                ctx.fill(x + px, y + py, x + px + step, y + py + step, c);
-            }
+            float s = w <= 1 ? 0f : (float) px / (w - 1);
+            int top = packRgb(hsvToRgb(hue, s, 1f));
+            int x2 = Math.min(x + px + step, x + w);
+            ctx.fillGradient(x + px, y, x2, y + h, top, 0xFF000000);
         }
     }
 
-    private void drawHueStrip(DrawContext ctx, int x, int y, int w, int h) {
-        int step = 2;
+    private void drawHueStrip(GuiGraphicsExtractor ctx, int x, int y, int w, int h) {
+        int step = 3;
         for (int py = 0; py < h; py += step) {
-            float h2 = (float) py / (h - 1) * 360f;
-            float[] rgb = hsvToRgb(h2, 1f, 1f);
-            int c = 0xFF000000 | ((int)(rgb[0]*255) << 16) | ((int)(rgb[1]*255) << 8) | (int)(rgb[2]*255);
-            ctx.fill(x, y + py, x + w, y + py + step, c);
+            float h2 = h <= 1 ? 0f : (float) py / (h - 1) * 360f;
+            int c = packRgb(hsvToRgb(h2, 1f, 1f));
+            int y2 = Math.min(y + py + step, y + h);
+            ctx.fill(x, y + py, x + w, y2, c);
         }
+    }
+
+    private static int packRgb(float[] rgb) {
+        return 0xFF000000
+                | ((int) (rgb[0] * 255) << 16)
+                | ((int) (rgb[1] * 255) << 8)
+                | (int) (rgb[2] * 255);
     }
 
     private boolean inSV(double mx, double my) {
@@ -262,7 +270,7 @@ public class ColorPickerPopup {
         return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') || c == '#';
     }
 
-    private static void drawBorder(DrawContext ctx, int x, int y, int w, int h, int color) {
+    private static void drawBorder(GuiGraphicsExtractor ctx, int x, int y, int w, int h, int color) {
         ctx.fill(x,       y,       x + w,   y + 1,   color);
         ctx.fill(x,       y + h-1, x + w,   y + h,   color);
         ctx.fill(x,       y,       x + 1,   y + h,   color);

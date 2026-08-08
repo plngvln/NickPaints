@@ -1,6 +1,6 @@
 {
   "key.nickpaints.open_gui": "Opun NickPaints Settin'z",
-  "category.nickpaints.main": "NickPaintz",
+  "key.category.nickpaints.main": "NickPaintz",
   "chat.nickpaints.sync.success": "Paint synkd wif da cloudz! YAY!",
   "chat.nickpaints.sync.failure": "Uh-oh! Paint no syncz: %s",
   "chat.nickpaints.sync.auth_failed": "Auth failz. Maybe ur session iz ded. Try restartin ur gamez.",

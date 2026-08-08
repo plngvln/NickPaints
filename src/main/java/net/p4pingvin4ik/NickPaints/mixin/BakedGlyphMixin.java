@@ -1,17 +1,19 @@
 package net.p4pingvin4ik.NickPaints.mixin;
 
-import net.minecraft.client.font.BakedGlyph;
-import net.minecraft.client.render.VertexConsumer;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.gui.font.glyphs.BakedSheetGlyph;
+import net.minecraft.util.ARGB;
 import net.p4pingvin4ik.NickPaints.client.GradientCache;
 import net.p4pingvin4ik.NickPaints.client.NickPaintsMod;
 import net.p4pingvin4ik.NickPaints.util.GradientData;
 import net.p4pingvin4ik.NickPaints.util.GradientUtil;
-import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
@@ -19,40 +21,32 @@ import java.awt.Color;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
-@Mixin(BakedGlyph.class)
+@Mixin(BakedSheetGlyph.class)
 public abstract class BakedGlyphMixin {
 
-    @Shadow @Final private float minU;
-    @Shadow @Final private float maxU;
-    @Shadow @Final private float minV;
-    @Shadow @Final private float maxV;
-    @Shadow @Final private float minX;
-    @Shadow @Final private float maxX;
-    @Shadow @Final private float minY;
-    @Shadow @Final private float maxY;
+    @Shadow @Final private float u0;
+    @Shadow @Final private float u1;
+    @Shadow @Final private float v0;
+    @Shadow @Final private float v1;
+    @Shadow @Final private float left;
+    @Shadow @Final private float right;
+    @Shadow @Final private float up;
+    @Shadow @Final private float down;
 
     @Unique
     private static final float SHADOW_DARKEN_FACTOR = 0.25f;
 
-    /**
-     * Injects custom drawing logic at the head of the draw() method, effectively overriding it.
-     * This method is the entry point for rendering glyphs with a gradient.
-     *
-     * @param glyph The glyph being drawn.
-     * @param matrix The transformation matrix.
-     * @param vertexConsumer The vertex consumer to draw to.
-     * @param light The light level.
-     * @param fixedZ Unused in this implementation.
-     * @param ci The callback info, used to cancel the original method.
-     */
-    @Inject(method = "draw(Lnet/minecraft/client/font/BakedGlyph$DrawnGlyph;Lorg/joml/Matrix4f;Lnet/minecraft/client/render/VertexConsumer;IZ)V", at = @At("HEAD"), cancellable = true)
-    private void drawWithPixelGradient(BakedGlyph.DrawnGlyph glyph, Matrix4f matrix, VertexConsumer vertexConsumer, int light, boolean fixedZ, CallbackInfo ci) {
+    @Inject(method = "renderChar", at = @At("HEAD"), cancellable = true)
+    private void drawWithPixelGradient(@Coerce Object glyphObj, Matrix4fc matrix, VertexConsumer vertexConsumer, int light, boolean fixedZ, CallbackInfo ci) {
         GradientData gradientData = GradientData.CURRENT_GRADIENT.get();
-        if (gradientData == null) {
+        // No paint / blank paint → leave the glyph to vanilla (incl. SEE_THROUGH dimming).
+        if (gradientData == null || gradientData.paintString == null || gradientData.paintString.trim().isEmpty()) {
             return;
         }
 
-        if (NickPaintsMod.PROTECTED_TAG_INSERTION_KEY.equals(glyph.style().getInsertion())) {
+        BakedSheetGlyphInstanceAccessor glyph = (BakedSheetGlyphInstanceAccessor) glyphObj;
+
+        if (NickPaintsMod.PROTECTED_TAG_INSERTION_KEY.equals(glyph.nickpaints$style().getInsertion())) {
             return;
         }
 
@@ -63,22 +57,21 @@ public abstract class BakedGlyphMixin {
             }
         }
 
-        if (glyph.shadowColor() != 0) {
-            drawGradientQuad(gradientData, glyph, matrix, vertexConsumer, light, glyph.shadowOffset(), true);
-            if (glyph.style().isBold()) {
-                drawGradientQuad(gradientData, glyph, matrix, vertexConsumer, light, glyph.shadowOffset() + glyph.boldOffset(), true);
+        if (glyph.nickpaints$shadowColor() != 0) {
+            drawGradientQuad(gradientData, glyph, matrix, vertexConsumer, light, glyph.nickpaints$shadowOffset(), true);
+            if (glyph.nickpaints$style().isBold()) {
+                drawGradientQuad(gradientData, glyph, matrix, vertexConsumer, light, glyph.nickpaints$shadowOffset() + glyph.nickpaints$boldOffset(), true);
             }
         }
 
         drawGradientQuad(gradientData, glyph, matrix, vertexConsumer, light, 0.0f, false);
-        if (glyph.style().isBold()) {
-            drawGradientQuad(gradientData, glyph, matrix, vertexConsumer, light, glyph.boldOffset(), false);
+        if (glyph.nickpaints$style().isBold()) {
+            drawGradientQuad(gradientData, glyph, matrix, vertexConsumer, light, glyph.nickpaints$boldOffset(), false);
         }
 
         ci.cancel();
     }
 
-    /** Horizontal position in gradient space: nametags use an anchor so only the nickname spans the palette. */
     @Unique
     private static float gradientSpaceX(float pixelX, GradientData data) {
         if (!data.isNicknameRestricted()) {
@@ -91,11 +84,16 @@ public abstract class BakedGlyphMixin {
     }
 
     /**
-     * Determines whether to draw a smooth or block-style gradient and calls the appropriate method.
-     * This acts as a dispatcher based on the gradient's style options.
+     * Bake in the prepared glyph color (e.g. 50% alpha for {@code SEE_THROUGH}) so painted
+     * nametags dim behind blocks like vanilla.
      */
     @Unique
-    private void drawGradientQuad(GradientData data, BakedGlyph.DrawnGlyph glyph, Matrix4f matrix, VertexConsumer vertexConsumer, int light, float offset, boolean isShadow) {
+    private static int applyGlyphColor(int gradientColor, BakedSheetGlyphInstanceAccessor glyph) {
+        return ARGB.multiply(gradientColor, glyph.nickpaints$color());
+    }
+
+    @Unique
+    private void drawGradientQuad(GradientData data, BakedSheetGlyphInstanceAccessor glyph, Matrix4fc matrix, VertexConsumer vertexConsumer, int light, float offset, boolean isShadow) {
         GradientUtil.GradientOptions options = GradientCache.getOptions(data.paintString, data.totalLength);
 
         float angle = Math.abs(options.angle());
@@ -107,64 +105,56 @@ public abstract class BakedGlyphMixin {
         }
     }
 
-    /**
-     * Renders the glyph with a vertical block-style gradient.
-     * The glyph is divided into horizontal slices, each filled with a solid color from the gradient.
-     */
     @Unique
-    private void drawVerticalBlocks(GradientUtil.GradientOptions options, GradientData data, BakedGlyph.DrawnGlyph glyph, Matrix4f matrix, VertexConsumer vertexConsumer, int light, float offset, boolean isShadow) {
+    private void drawVerticalBlocks(GradientUtil.GradientOptions options, GradientData data, BakedSheetGlyphInstanceAccessor glyph, Matrix4fc matrix, VertexConsumer vertexConsumer, int light, float offset, boolean isShadow) {
         List<Color> colors = options.colors();
         if (colors.isEmpty()) {
             return;
         }
 
         int numBlocks = colors.size();
-        float baseX = glyph.x() + offset;
-        float baseY = glyph.y();
+        float baseX = glyph.nickpaints$x() + offset;
+        float baseY = glyph.nickpaints$y();
 
-        float totalGlyphHeight = this.maxY - this.minY;
+        float totalGlyphHeight = this.down - this.up;
         float blockHeight = totalGlyphHeight / numBlocks;
 
-        float totalVRange = this.maxV - this.minV;
+        float totalVRange = this.v1 - this.v0;
         float blockVStep = totalVRange / numBlocks;
 
         for (int i = 0; i < numBlocks; i++) {
             float normalizedY = (i + 0.5f) * blockHeight;
-            int blockColor = GradientUtil.get2DColor(data.paintString, data.totalLength, gradientSpaceX(baseX + this.minX, data), normalizedY);
+            int blockColor = GradientUtil.get2DColor(data.paintString, data.totalLength, gradientSpaceX(baseX + this.left, data), normalizedY);
 
             if (isShadow) {
                 blockColor = darken(blockColor);
             }
+            blockColor = applyGlyphColor(blockColor, glyph);
 
-            float currentMinY = baseY + this.minY + i * blockHeight;
+            float currentMinY = baseY + this.up + i * blockHeight;
             float currentMaxY = currentMinY + blockHeight;
-            float currentMinV = this.minV + i * blockVStep;
+            float currentMinV = this.v0 + i * blockVStep;
             float currentMaxV = currentMinV + blockVStep;
 
-            vertexConsumer.vertex(matrix, baseX + minX, currentMinY, 0).color(blockColor).texture(minU, currentMinV).light(light);
-            vertexConsumer.vertex(matrix, baseX + minX, currentMaxY, 0).color(blockColor).texture(minU, currentMaxV).light(light);
-            vertexConsumer.vertex(matrix, baseX + maxX, currentMaxY, 0).color(blockColor).texture(maxU, currentMaxV).light(light);
-            vertexConsumer.vertex(matrix, baseX + maxX, currentMinY, 0).color(blockColor).texture(maxU, currentMinV).light(light);
+            vertexConsumer.addVertex(matrix, baseX + left, currentMinY, 0).setColor(blockColor).setUv(u0, currentMinV).setLight(light);
+            vertexConsumer.addVertex(matrix, baseX + left, currentMaxY, 0).setColor(blockColor).setUv(u0, currentMaxV).setLight(light);
+            vertexConsumer.addVertex(matrix, baseX + right, currentMaxY, 0).setColor(blockColor).setUv(u1, currentMaxV).setLight(light);
+            vertexConsumer.addVertex(matrix, baseX + right, currentMinY, 0).setColor(blockColor).setUv(u1, currentMinV).setLight(light);
         }
     }
 
-    /**
-     * Renders the glyph with a smooth, interpolated gradient.
-     * It calculates the color at each of the four corners of the glyph's quad,
-     * and the GPU handles the smooth interpolation between them.
-     */
     @Unique
-    private void drawSmoothGradient(GradientData data, BakedGlyph.DrawnGlyph glyph, Matrix4f matrix, VertexConsumer vertexConsumer, int light, float offset, boolean isShadow) {
-        float baseX = glyph.x() + offset;
-        float baseY = glyph.y();
+    private void drawSmoothGradient(GradientData data, BakedSheetGlyphInstanceAccessor glyph, Matrix4fc matrix, VertexConsumer vertexConsumer, int light, float offset, boolean isShadow) {
+        float baseX = glyph.nickpaints$x() + offset;
+        float baseY = glyph.nickpaints$y();
 
         float glyphRelativeTopY = 0;
-        float glyphRelativeBottomY = maxY - minY;
+        float glyphRelativeBottomY = down - up;
 
-        int colorTopLeft = GradientUtil.get2DColor(data.paintString, data.totalLength, gradientSpaceX(baseX + minX, data), glyphRelativeTopY);
-        int colorBottomLeft = GradientUtil.get2DColor(data.paintString, data.totalLength, gradientSpaceX(baseX + minX, data), glyphRelativeBottomY);
-        int colorBottomRight = GradientUtil.get2DColor(data.paintString, data.totalLength, gradientSpaceX(baseX + maxX, data), glyphRelativeBottomY);
-        int colorTopRight = GradientUtil.get2DColor(data.paintString, data.totalLength, gradientSpaceX(baseX + maxX, data), glyphRelativeTopY);
+        int colorTopLeft = GradientUtil.get2DColor(data.paintString, data.totalLength, gradientSpaceX(baseX + left, data), glyphRelativeTopY);
+        int colorBottomLeft = GradientUtil.get2DColor(data.paintString, data.totalLength, gradientSpaceX(baseX + left, data), glyphRelativeBottomY);
+        int colorBottomRight = GradientUtil.get2DColor(data.paintString, data.totalLength, gradientSpaceX(baseX + right, data), glyphRelativeBottomY);
+        int colorTopRight = GradientUtil.get2DColor(data.paintString, data.totalLength, gradientSpaceX(baseX + right, data), glyphRelativeTopY);
 
         if (isShadow) {
             colorTopLeft = darken(colorTopLeft);
@@ -173,19 +163,17 @@ public abstract class BakedGlyphMixin {
             colorTopRight = darken(colorTopRight);
         }
 
-        vertexConsumer.vertex(matrix, baseX + minX, baseY + minY, 0).color(colorTopLeft).texture(minU, minV).light(light);
-        vertexConsumer.vertex(matrix, baseX + minX, baseY + maxY, 0).color(colorBottomLeft).texture(minU, maxV).light(light);
-        vertexConsumer.vertex(matrix, baseX + maxX, baseY + maxY, 0).color(colorBottomRight).texture(maxU, maxV).light(light);
-        vertexConsumer.vertex(matrix, baseX + maxX, baseY + minY, 0).color(colorTopRight).texture(maxU, minV).light(light);
+        colorTopLeft = applyGlyphColor(colorTopLeft, glyph);
+        colorBottomLeft = applyGlyphColor(colorBottomLeft, glyph);
+        colorBottomRight = applyGlyphColor(colorBottomRight, glyph);
+        colorTopRight = applyGlyphColor(colorTopRight, glyph);
+
+        vertexConsumer.addVertex(matrix, baseX + left, baseY + up, 0).setColor(colorTopLeft).setUv(u0, v0).setLight(light);
+        vertexConsumer.addVertex(matrix, baseX + left, baseY + down, 0).setColor(colorBottomLeft).setUv(u0, v1).setLight(light);
+        vertexConsumer.addVertex(matrix, baseX + right, baseY + down, 0).setColor(colorBottomRight).setUv(u1, v1).setLight(light);
+        vertexConsumer.addVertex(matrix, baseX + right, baseY + up, 0).setColor(colorTopRight).setUv(u1, v0).setLight(light);
     }
 
-    /**
-     * Darkens a color by a fixed factor. Used for rendering shadows.
-     * The alpha channel is preserved.
-     *
-     * @param color The original color in integer ARGB format.
-     * @return The darkened color in integer ARGB format.
-     */
     @Unique
     private int darken(int color) {
         int alpha = (color >> 24) & 0xFF;

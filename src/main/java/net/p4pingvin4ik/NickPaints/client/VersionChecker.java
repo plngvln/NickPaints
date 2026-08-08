@@ -5,11 +5,11 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.HoverEvent;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 import org.slf4j.Logger;
 
 import java.net.URI;
@@ -45,7 +45,7 @@ public class VersionChecker {
     public static void checkForUpdates() {
         LOGGER.info("Checking for NickPaints updates via Modrinth API...");
         try {
-            String gameVersion = MinecraftClient.getInstance().getGameVersion();
+            String gameVersion = Minecraft.getInstance().getLaunchedVersion();
             String loadersParam = URLEncoder.encode("[\"fabric\"]", StandardCharsets.UTF_8);
             String gameVersionsParam = URLEncoder.encode("[\"" + gameVersion + "\"]", StandardCharsets.UTF_8);
             String urlWithParams = String.format("%s?loaders=%s&game_versions=%s", MODRINTH_API_URL, loadersParam, gameVersionsParam);
@@ -103,20 +103,20 @@ public class VersionChecker {
     }
 
     private static void notifyPlayerInChat(String newVersion, String url) {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client.player == null) return;
-        Text message = Text.literal("[NickPaints] ").formatted(Formatting.GOLD)
+        Component message = Component.literal("[NickPaints] ").withStyle(ChatFormatting.GOLD)
                 // Main message body with a placeholder for the version number.
-                .append(Text.translatable("chat.nickpaints.update.main", newVersion).formatted(Formatting.YELLOW))
+                .append(Component.translatable("chat.nickpaints.update.main", newVersion).withStyle(ChatFormatting.YELLOW))
                 .append(" ") // Add a space before the link
                 // The clickable link part.
-                .append(Text.translatable("chat.nickpaints.update.link")
-                        .formatted(Formatting.GREEN, Formatting.BOLD)
-                        .styled(style -> {
+                .append(Component.translatable("chat.nickpaints.update.link")
+                        .withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD)
+                        .withStyle(style -> {
                             try {
                                 ClickEvent clickEvent = new ClickEvent.OpenUrl(new URI(url));
                                 // The hover text is also translatable.
-                                HoverEvent hoverEvent = new HoverEvent.ShowText(Text.translatable("chat.nickpaints.update.hover"));
+                                HoverEvent hoverEvent = new HoverEvent.ShowText(Component.translatable("chat.nickpaints.update.hover"));
                                 return style.withClickEvent(clickEvent).withHoverEvent(hoverEvent);
                             } catch (Exception e) {
                                 return style;
@@ -124,7 +124,7 @@ public class VersionChecker {
                         })
                 );
 
-        client.player.sendMessage(message, false);
+        client.player.sendSystemMessage(message);
     }
     private static String getCurrentModVersion() {
         return FabricLoader.getInstance()

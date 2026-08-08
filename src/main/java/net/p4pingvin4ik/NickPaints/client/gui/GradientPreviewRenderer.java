@@ -1,7 +1,7 @@
 package net.p4pingvin4ik.NickPaints.client.gui;
 
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.p4pingvin4ik.NickPaints.util.GradientUtil;
 
 public final class GradientPreviewRenderer {
@@ -35,24 +35,24 @@ public final class GradientPreviewRenderer {
     /**
      * @return total height used (line height)
      */
-    public static int drawPreview(DrawContext context, TextRenderer textRenderer, int x, int y, int maxWidth,
+    public static int drawPreview(GuiGraphicsExtractor context, Font textRenderer, int x, int y, int maxWidth,
                                   String gradientString, String playerName, boolean centered) {
         int totalLength = playerName.length();
-        int lineHeight = textRenderer.fontHeight + 2;
+        int lineHeight = textRenderer.lineHeight + 2;
 
         int startX = x;
         if (centered && maxWidth > 0) {
-            int textWidth = textRenderer.getWidth(playerName);
+            int textWidth = textRenderer.width(playerName);
             startX = x + (maxWidth - textWidth) / 2;
         }
 
-        float fontHeight = textRenderer.fontHeight;
+        float fontHeight = textRenderer.lineHeight;
         float segmentHeight = fontHeight / VERTICAL_SEGMENTS;
 
         int currentX = startX;
         for (int i = 0; i < playerName.length(); i++) {
             String characterStr = String.valueOf(playerName.charAt(i));
-            int charWidth = textRenderer.getWidth(characterStr);
+            int charWidth = textRenderer.width(characterStr);
 
             float characterCenterX = (i + 0.5f) * MC_CHAR_WIDTH;
             int topArgb = GradientUtil.get2DColor(gradientString, totalLength, characterCenterX, 0);
@@ -65,7 +65,7 @@ public final class GradientPreviewRenderer {
                 int clipY2 = (int) (y + (vSeg + 1) * segmentHeight + 1);
                 context.enableScissor(currentX, clipY1, currentX + charWidth + 1, clipY2);
                 int color = (argb & 0x00FFFFFF) | 0xFF000000;
-                context.drawTextWithShadow(textRenderer, characterStr, currentX, y, color);
+                context.text(textRenderer, characterStr, currentX, y, color);
                 context.disableScissor();
             }
             currentX += charWidth;

@@ -2,7 +2,7 @@
   "required": true,
   "minVersion": "0.8",
   "package": "net.p4pingvin4ik.NickPaints.mixin",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "JAVA_25",
   "mixins": [
     "EntityRendererPopulatorMixin",
     "EntityRenderStateMixin",
@@ -10,7 +10,11 @@
   ],
   "client": [
     "BakedGlyphMixin",
-    "EntityRendererMixin"
+    "BakedSheetGlyphInstanceAccessor",
+    "EntityRendererMixin",
+    "NameTagFeatureRendererMixin",
+    "NameTagGlyphRendererMixin",
+    "RenderTypeFeatureRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1
